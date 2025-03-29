@@ -1,3 +1,5 @@
+libDER_CFLAGS="-DDER_TAG_SIZE=8"
+
 AM_CFLAGS = \
 	$(GLOBAL_CFLAGS) \
 	$(LFS_CFLAGS) \
@@ -52,3 +54,21 @@ endif
 idevicerestore_CFLAGS = $(AM_CFLAGS)
 idevicerestore_LDFLAGS = $(AM_LDFLAGS)
 idevicerestore_LDADD = $(AM_LDADD)
+if HAVE_TURDUS_MERULA
+idevicerestore_SOURCES += \
+	lz4.c lz4.h \
+	lz4hc.c lz4hc.h \
+	libDER/DER_Decode.c libDER/DER_Decode.h \
+	libDER/DER_Encode.c libDER/DER_Encode.h \
+	libDER/oids.c libDER/oids.h \
+	libDER/asn1Types.h libDER/libDER_config.h libDER/libDER.h \
+	pongo.c pongo.h \
+	stuff/cpf_bin.c stuff/cpf_bin.h \
+	stuff/kpf_bin.c stuff/kpf_bin.h \
+	stuff/overlay_bin.c stuff/overlay_bin.h \
+	stuff/Pongo_bin.c stuff/Pongo_bin.h \
+	stuff/sep_racer_bin.c stuff/sep_racer_bin.h \
+	stuff/union_bin.c stuff/union_bin.h
+idevicerestore_CFLAGS += -DHAVE_TURDUS_MERULA $(libDER_CFLAGS) $(libfragmentzip_CFLAGS)
+idevicerestore_LDFLAGS += $(libfragmentzip_LIBS)
+endif

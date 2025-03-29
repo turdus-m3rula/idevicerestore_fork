@@ -48,6 +48,7 @@ extern "C" {
 #define _MODE_RESTORE         4
 #define _MODE_NORMAL          5
 #define _MODE_PORTDFU         6
+#define _MODE_PONGO           7
 
 #define MODE_UNKNOWN  &idevicerestore_modes[_MODE_UNKNOWN]
 #define MODE_WTF      &idevicerestore_modes[_MODE_WTF]
@@ -56,6 +57,7 @@ extern "C" {
 #define MODE_RESTORE  &idevicerestore_modes[_MODE_RESTORE]
 #define MODE_NORMAL   &idevicerestore_modes[_MODE_NORMAL]
 #define MODE_PORTDFU  &idevicerestore_modes[_MODE_PORTDFU]
+#define MODE_PONGO    &idevicerestore_modes[_MODE_PONGO]
 
 #define FLAG_QUIT            1
 
@@ -92,7 +94,7 @@ struct idevicerestore_entry_t {
 };
 
 struct idevicerestore_client_t {
-	int flags;
+	uint64_t flags;
 	int debug_level;
 	plist_t tss;
 	plist_t tss_localpolicy;
@@ -138,6 +140,74 @@ struct idevicerestore_client_t {
 	char* filesystem;
 	int delete_fs;
 	int async_err;
+    
+#ifdef HAVE_TURDUS_MERULA
+	int disable_serial_output;
+	uint16_t cpid;
+	uint8_t bdid;
+	plist_t local_shsh;
+	int use_custom_ticket;
+	
+	int need_asr_patch;
+	
+	int get_shc_block;
+	int get_pte_block;
+	
+	int sep_fwload_race;
+	int sep_boot_tz0_race;
+	
+	char* cryptex1_nonce_seed;
+	void* sepi_im4p; // 'sepi' im4p
+	size_t sepi_im4p_len;
+	void* rsep_img4; // signed 'rsep' img4
+	size_t rsep_img4_len;
+	void* img4_manifest;
+	uint64_t img4_manifest_len;
+	void* img4_manifest_hash;
+	size_t img4_manifest_hash_len;
+	void* sep_shellcode_block;
+	size_t sep_shellcode_block_len;
+	
+	int use_specific_fwver_component;
+	char* signed_variant;
+	plist_t signed_manifest;
+	plist_t signed_identity;
+	
+	uint8_t* bbfw;
+	size_t bbfw_len;
+	
+	uint8_t* sefw;
+	size_t sefw_len;
+	
+	uint8_t* rsepfw;
+	size_t rsepfw_len;
+	
+	// ios 9 haxx
+	uint8_t* alternative_ibss;
+	size_t alternative_ibss_len;
+	
+	// tethered
+	uint8_t* t_LLB;
+	size_t t_LLB_len;
+	uint8_t* t_AppleLogo;
+	size_t t_AppleLogo_len;
+	uint8_t* t_BatteryCharging0;
+	size_t t_BatteryCharging0_len;
+	uint8_t* t_BatteryCharging1;
+	size_t t_BatteryCharging1_len;
+	uint8_t* t_BatteryFull;
+	size_t t_BatteryFull_len;
+	uint8_t* t_BatteryLow0;
+	size_t t_BatteryLow0_len;
+	uint8_t* t_BatteryLow1;
+	size_t t_BatteryLow1_len;
+	uint8_t* t_BatteryPlugin;
+	size_t t_BatteryPlugin_len;
+	uint8_t* t_RecoveryMode;
+	size_t t_RecoveryMode_len;
+	uint8_t* t_iBoot;
+	size_t t_iBoot_len;
+#endif
 };
 
 extern struct idevicerestore_mode_t idevicerestore_modes[];
