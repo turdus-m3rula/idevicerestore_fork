@@ -2824,25 +2824,17 @@ static plist_t restore_get_se_firmware_data(struct idevicerestore_client_t* clie
 	plist_t p_dgr = NULL;
 	int ret;
 	uint64_t chip_id = 0;
+#ifdef HAVE_TURDUS_MERULA
+	bool use_latest_sefw = 0;
+#endif
 
 	if (!client || !client->restore || !client->restore->build_identity) {
 		error("ERROR: %s: idevicerestore client not initialized?!\n", __func__);
 		return NULL;
 	}
 
-	plist_t se_identity = NULL;
-#ifdef HAVE_TURDUS_MERULA
-	if ((client->signed_identity == NULL) || client->sefw == NULL) {
-#endif
-		se_identity = client->restore->build_identity;
-#ifdef HAVE_TURDUS_MERULA
-	}
-	else {
-		info("using another build manifest\n");
-		se_identity = client->signed_identity;
-	}
-#endif
-	
+	plist_t se_identity = client->restore->build_identity;
+
 	plist_t node = plist_dict_get_item(p_info, "SE,ChipID");
 	if (node && plist_get_node_type(node) == PLIST_UINT) {
 		plist_get_uint_val(node, &chip_id);
@@ -2861,8 +2853,8 @@ static plist_t restore_get_se_firmware_data(struct idevicerestore_client_t* clie
 			error("ERROR: Neither 'SE,Firmware' nor 'SE,UpdatePayload' found in build identity.\n");
 			return NULL;
 		}
-		debug("DEBUG: %s: using %s\n", __func__, comp_name);
 	}
+	debug("DEBUG: %s: using %s\n", __func__, comp_name);
 
 	p_dgr = plist_dict_get_item(arguments, "DeviceGeneratedRequest");
 	if (!p_dgr) {
@@ -2892,10 +2884,51 @@ static plist_t restore_get_se_firmware_data(struct idevicerestore_client_t* clie
 	tss_request_add_se_tags(request, parameters, p_dgr);
 
 	plist_free(parameters);
+	parameters = NULL;
 
 	info("Sending SE TSS request...\n");
 	response = tss_request_send(request, client->tss_url);
 	plist_free(request);
+	request = NULL;
+
+#ifdef HAVE_TURDUS_MERULA
+	if (response == NULL) {
+		if ((client->signed_identity != NULL) && (client->sefw != NULL)) {
+			info("using another build manifest\n");
+			use_latest_sefw = 1;
+
+			/* select new SE build_identity */
+			se_identity = client->signed_identity;
+
+			/* create new SE request */
+			request = tss_request_new(NULL);
+			if (request == NULL) {
+				error("ERROR: Unable to create SE TSS request\n");
+				free(component_data);
+				return NULL;
+			}
+			parameters = plist_new_dict();
+
+			/* add manifest for current build_identity to parameters */
+			tss_parameters_add_from_manifest(parameters, se_identity, true);
+
+			/* add SE,* tags from info dictionary to parameters */
+			plist_dict_merge(&parameters, p_info);
+
+			/* add required tags for SE TSS request */
+			tss_request_add_se_tags(request, parameters, NULL);
+
+			plist_free(parameters);
+			parameters = NULL;
+
+			info("Sending new SE TSS request...\n");
+			response = tss_request_send(request, client->tss_url);
+			plist_free(request);
+			request = NULL;
+		}
+	}
+#endif
+
 	if (response == NULL) {
 		error("ERROR: Unable to fetch SE ticket\n");
 		free(component_data);
@@ -2923,15 +2956,15 @@ static plist_t restore_get_se_firmware_data(struct idevicerestore_client_t* clie
 		}
 #ifdef HAVE_TURDUS_MERULA
 	}
-	
-	if ((client->signed_identity == NULL) || client->sefw == NULL) {
+
+	if (!use_latest_sefw) {
 #endif
-		if (build_identity_get_component_path(client->restore->build_identity, comp_name, &comp_path) < 0) {
+		if (build_identity_get_component_path(se_identity, comp_name, &comp_path) < 0) {
 			plist_free(response);
 			error("ERROR: Unable to get path for '%s' component\n", comp_name);
 			return NULL;
 		}
-		
+
 		ret = extract_component(client->ipsw, comp_path, &component_data, &component_size);
 		free(comp_path);
 		comp_path = NULL;
@@ -2946,10 +2979,15 @@ static plist_t restore_get_se_firmware_data(struct idevicerestore_client_t* clie
 		info("using another se firmware\n");
 		component_size = client->sefw_len;
 		component_data = malloc(component_size);
+		if (!component_data) {
+			plist_free(response);
+			error("ERROR: Unable to alloc '%s' component\n", comp_name);
+			return NULL;
+		}
 		memcpy(component_data, client->sefw, component_size);
 	}
 #endif
-	
+
 	plist_dict_set_item(response, "FirmwareData", plist_new_data((char*)component_data, component_size));
 	free(component_data);
 	component_data = NULL;
