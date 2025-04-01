@@ -5238,7 +5238,7 @@ int check_firmware_components(struct idevicerestore_client_t* client, plist_t bu
 		if (client->flags & FLAG_INTERACTIVE) {
 			char input[64];
 			printf("######################## [ WARNING ] ########################\n"
-				   "# Found %s                                 #\n"
+				   "# Found %s                            #\n"
 				   "# This means that the restore may fail causing FDR error.   #\n"
 				   "# If you want to continue, please type YES and press ENTER. #\n"
 				   "#############################################################\n", errstr);

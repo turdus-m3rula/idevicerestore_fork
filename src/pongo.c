@@ -117,11 +117,11 @@ static int lz4_compress_and_add_shc(const void *inbuf, const size_t insize, void
 
 static void patch_pongo(uint8_t* pongo, const size_t sz, int sigcheckPatch)
 {
-	uint64_t magicval[1] = {
-		0x1337cafebabe4100,
+	uint8_t magicval[8] = {
+		0x13, 0x37, 0xca, 0xfe, 0xba, 0xbe, 0x41, 0x00,
 	};
-	
-	void* ptr = memmem((const void*)pongo, sz, (const void*)&magicval, sizeof(uint64_t) * 1);
+
+	void* ptr = memmem((const void*)pongo, sz, magicval, sizeof(uint8_t) * 8);
 	if (ptr) {
 		uint64_t* magic = (uint64_t*)ptr;
 		uint64_t ipf_flag = IPF_NONE;
