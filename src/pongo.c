@@ -118,7 +118,7 @@ static int lz4_compress_and_add_shc(const void *inbuf, const size_t insize, void
 static void patch_pongo(uint8_t* pongo, const size_t sz, int sigcheckPatch)
 {
 	uint8_t magicval[8] = {
-		0x13, 0x37, 0xca, 0xfe, 0xba, 0xbe, 0x41, 0x00,
+		0x00, 0x41, 0xbe, 0xba, 0xfe, 0xca, 0x37, 0x13
 	};
 
 	void* ptr = memmem((const void*)pongo, sz, magicval, sizeof(uint8_t) * 8);
