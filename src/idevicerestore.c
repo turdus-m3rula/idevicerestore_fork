@@ -73,10 +73,19 @@ static struct option longopts[] = {
 	{ "udid",           required_argument, NULL, 'u' },
 	{ "debug",          no_argument,       NULL, 'd' },
 	{ "help",           no_argument,       NULL, 'h' },
+	{ "server",         required_argument, NULL, 's' },
+	
+	{ "cache-path",     required_argument, NULL, 'C' },
+	{ "no-input",       no_argument,       NULL, 'y' },
+	{ "plain-progress", no_argument,       NULL, 'P' },
+	{ "version",        no_argument,       NULL, 'v' },
+	{ "ipsw-info",      no_argument,       NULL, 'I' },
+	{ "variant",        required_argument, NULL,  2  },
+	
+#ifndef HAVE_TURDUS_MERULA
 	{ "erase",          no_argument,       NULL, 'e' },
 	{ "custom",         no_argument,       NULL, 'c' },
 	{ "latest",         no_argument,       NULL, 'l' },
-	{ "server",         required_argument, NULL, 's' },
 	{ "exclude",        no_argument,       NULL, 'x' },
 	{ "shsh",           no_argument,       NULL, 't' },
 	{ "keep-pers",      no_argument,       NULL, 'k' },
@@ -84,16 +93,11 @@ static struct option longopts[] = {
 	{ "pwn",            no_argument,       NULL, 'p' },
 #endif
 	{ "no-action",      no_argument,       NULL, 'n' },
-	{ "cache-path",     required_argument, NULL, 'C' },
-	{ "no-input",       no_argument,       NULL, 'y' },
-	{ "plain-progress", no_argument,       NULL, 'P' },
 	{ "restore-mode",   no_argument,       NULL, 'R' },
 	{ "ticket",         required_argument, NULL, 'T' },
 	{ "no-restore",     no_argument,       NULL, 'z' },
-	{ "version",        no_argument,       NULL, 'v' },
-	{ "ipsw-info",      no_argument,       NULL, 'I' },
 	{ "ignore-errors",  no_argument,       NULL,  1  },
-	{ "variant",        required_argument, NULL,  2  },
+#endif
 	
 #ifdef HAVE_TURDUS_MERULA
 	{ "downgrade",       no_argument,       NULL, 'w' },
@@ -145,6 +149,39 @@ static void usage(int argc, char* argv[], int err)
 #define TURDUS_MERULA_FLAG_LINE ""
 #endif
 	
+#ifndef HAVE_TURDUS_MERULA
+#define NON_TURDUS_MERULA_OPTION_FLAG_LINE "" \
+	"  -l, --latest          Use latest available firmware (with download on demand).\n" \
+	"                        Before performing any action it will interactively ask\n" \
+	"                        to select one of the currently signed firmware versions,\n" \
+	"                        unless -y has been given too.\n" \
+	"                        The PATH argument is ignored when using this option.\n" \
+	"                        DO NOT USE if you need to preserve the baseband/unlock!\n" \
+	"                        USE WITH CARE if you want to keep a jailbreakable\n" \
+	"                        firmware!\n" \
+	"  -e, --erase           Perform full restore instead of update, erasing all data\n" \
+	"                        DO NOT USE if you want to preserve user data on the device!\n" \
+	"  -n, --no-action       Do not perform any restore action. If combined with -l\n" \
+	"                        option the on-demand ipsw download is performed before\n" \
+	"                        exiting.\n"
+#define NON_TURDUS_MERULA_ADVANCED_OPTION_FLAG_LINE "" \
+	"  -c, --custom          Restore with a custom firmware (requires bootrom exploit)\n" \
+	"  -x, --exclude         Exclude nor/baseband upgrade (legacy devices)\n" \
+	"  -t, --shsh            Fetch TSS record and save to .shsh file, then exit\n" \
+	"  -z, --no-restore      Do not restore and end after booting to the ramdisk\n" \
+	"  -k, --keep-pers       Write personalized components to files for debugging\n" \
+	PWN_FLAG_LINE \
+	"  -R, --restore-mode    Allow restoring from Restore mode\n" \
+	"  -T, --ticket PATH     Use file at PATH to send as AP ticket\n" \
+	"  --ignore-errors       Try to continue the restore process after certain\n" \
+	"                        errors (like a failed baseband update)\n" \
+	"                        WARNING: This might render the device unable to boot\n" \
+	"                        or only partially functioning. Use with caution.\n"
+#else
+#define NON_TURDUS_MERULA_OPTION_FLAG_LINE ""
+#define NON_TURDUS_MERULA_ADVANCED_OPTION_FLAG_LINE ""
+#endif
+	
 	char* name = strrchr(argv[0], '/');
 	fprintf((err) ? stderr : stdout,
 	"Usage: %s [OPTIONS] PATH\n" \
@@ -159,46 +196,23 @@ static void usage(int argc, char* argv[], int err)
 	"                        e.g. 0xaabb123456 (hex) or 1234567890 (decimal)\n" \
 	"  -u, --udid UDID       Target specific device by its device UDID\n" \
 	"                        NOTE: only works with devices in normal mode.\n" \
-	"  -l, --latest          Use latest available firmware (with download on demand).\n" \
-	"                        Before performing any action it will interactively ask\n" \
-	"                        to select one of the currently signed firmware versions,\n" \
-	"                        unless -y has been given too.\n" \
-	"                        The PATH argument is ignored when using this option.\n" \
-	"                        DO NOT USE if you need to preserve the baseband/unlock!\n" \
-	"                        USE WITH CARE if you want to keep a jailbreakable\n" \
-	"                        firmware!\n" \
-	"  -e, --erase           Perform full restore instead of update, erasing all data\n" \
-	"                        DO NOT USE if you want to preserve user data on the device!\n" \
 	"  -y, --no-input        Non-interactive mode, do not ask for any input.\n" \
 	"                        WARNING: This will disable certain checks/prompts that\n" \
 	"                        are supposed to prevent DATA LOSS. Use with caution.\n" \
-	"  -n, --no-action       Do not perform any restore action. If combined with -l\n" \
-	"                        option the on-demand ipsw download is performed before\n" \
-	"                        exiting.\n" \
 	"  --ipsw-info           Print information about the IPSW at PATH and exit.\n" \
 	"  -h, --help            Prints this usage information\n" \
 	"  -C, --cache-path DIR  Use specified directory for caching extracted or other\n" \
 	"                        reused files.\n" \
 	"  -d, --debug           Enable communication debugging\n" \
 	"  -v, --version         Print version information\n" \
+	NON_TURDUS_MERULA_OPTION_FLAG_LINE \
 	"\n" \
 	"Advanced/experimental options:\n"
-	"  -c, --custom          Restore with a custom firmware (requires bootrom exploit)\n" \
 	"  -s, --server URL      Override default signing server request URL\n" \
-	"  -x, --exclude         Exclude nor/baseband upgrade (legacy devices)\n" \
-	"  -t, --shsh            Fetch TSS record and save to .shsh file, then exit\n" \
-	"  -z, --no-restore      Do not restore and end after booting to the ramdisk\n" \
-	"  -k, --keep-pers       Write personalized components to files for debugging\n" \
-	PWN_FLAG_LINE \
 	"  -P, --plain-progress  Print progress as plain step and progress\n" \
-	"  -R, --restore-mode    Allow restoring from Restore mode\n" \
-	"  -T, --ticket PATH     Use file at PATH to send as AP ticket\n" \
 	"  --variant VARIANT     Use given VARIANT to match the build identity to use,\n" \
 	"                        e.g. 'Customer Erase Install (IPSW)'\n" \
-	"  --ignore-errors       Try to continue the restore process after certain\n" \
-	"                        errors (like a failed baseband update)\n" \
-	"                        WARNING: This might render the device unable to boot\n" \
-	"                        or only partially functioning. Use with caution.\n" \
+	NON_TURDUS_MERULA_ADVANCED_OPTION_FLAG_LINE \
 	// Downgrade command
 	TURDUS_MERULA_FLAG_LINE \
 	"Homepage:    <" PACKAGE_URL ">\n" \
@@ -237,6 +251,72 @@ int hexparse(uint8_t *buf, char *s, size_t len)
 		(uint8_t)(d >= '0' && d <= '9' ? d - '0' : (d >= 'a' && d <= 'f' ? d - 'a' : d - 'A') + 10);
 	}
 	return 0;
+}
+
+static bool is_bsep(sep_block_t* bsep)
+{
+	if (!bsep) {
+		return false;
+	}
+	if (bsep->magic != BSEP_MAGIC) {
+		return false;
+	}
+	return true;
+}
+
+static bool bsep_validate(sep_block_t* bsep)
+{
+	if (!bsep) {
+		return false;
+	}
+	if (is_bsep(bsep) == false) {
+		return false;
+	}
+	switch (bsep->block_version) {
+		case BSEP_VERSION_1:
+			return true;
+		default: // undefined
+			break;
+	}
+	return false;
+}
+
+static bool get_bsep_bversion(sep_block_t* bsep, uint32_t* rv)
+{
+	if (!bsep) {
+		return false;
+	}
+	if (is_bsep(bsep) == false) {
+		return false;
+	}
+	if (bsep_validate(bsep) == false) {
+		return false;
+	}
+	if (rv) {
+		*rv = bsep->block_version;
+	}
+	return true;
+}
+
+static bool get_bsep_type(sep_block_t* bsep, uint32_t* rv)
+{
+	if (!bsep) {
+		return false;
+	}
+	uint32_t bsep_bversion = 0;
+	if (get_bsep_bversion(bsep, &bsep_bversion) == false) {
+		return false;
+	}
+	if (bsep_bversion != BSEP_VERSION_1) {
+		return false; // unknown version
+	}
+	if (bsep->type != BSEP_TYPE_SHC && bsep->type != BSEP_TYPE_PTE) {
+		return false; // unknown type
+	}
+	if (rv) {
+		*rv = bsep->type;
+	}
+	return true;
 }
 #endif
 
@@ -658,6 +738,36 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 			if (client->get_shc_block && client->get_pte_block) {
 				error("ERROR: Conflict detected\n");
 				return -2;
+			}
+		}
+		
+		if (client->sep_shellcode_block && client->sep_shellcode_block_len) {
+			if (client->sep_shellcode_block_len == 0x80) {
+				info("INFO: This block is old version!\n");
+			}
+			else {
+				info("Checking block type\n");
+				bool _bsep_is_valid = 0;
+				sep_block_t* bsep = (sep_block_t*)client->sep_shellcode_block;
+				uint32_t myType = 0;
+				if (get_bsep_type(bsep, &myType) == false) {
+					error("ERROR: block type check failed!\n");
+					return -2;
+				}
+				if (myType == BSEP_TYPE_SHC) {
+					if (client->sep_fwload_race) {
+						_bsep_is_valid = 1;
+					}
+				}
+				if (myType == BSEP_TYPE_PTE) {
+					if (client->sep_boot_tz0_race) {
+						_bsep_is_valid = 1;
+					}
+				}
+				if (!_bsep_is_valid) {
+					error("ERROR: Invalid block type!\n");
+					return -2;
+				}
 			}
 		}
 		
@@ -2532,7 +2642,7 @@ debug("%s length: %zu\n", #name, client->t_##name##_len); \
 	// now finally do the magic to put the device into restore mode
 	if (client->mode == MODE_RECOVERY) {
 #ifdef HAVE_TURDUS_MERULA
-		if ((client->flags & FLAG_DOWNGRADE)) {
+		if (client->flags & FLAG_DOWNGRADE) {
 			if (!(client->flags & FLAG_BOOT_PONGO) || (client->sep_fwload_race && client->get_pte_block)) {
 				// extract sep im4p
 				if (client->sep_fwload_race || (client->flags & FLAG_TETHERED)) {
@@ -4972,88 +5082,8 @@ end:
 int check_firmware_components(struct idevicerestore_client_t* client, plist_t build_identity)
 {
 	if (client->flags & FLAG_TETHERED) {
-		/*
-		struct mem_filename_component_map {
-			const char *compname;
-			unsigned char *compdata;
-			unsigned int compdata_len;
-			plist_t comp_identity;
-			plist_t tss;
-			bool manifest;
-			bool payload;
-		};
-		struct mem_filename_component_map mem_fn_comp[] = {
-			{ "LLB", client->t_LLB, client->t_LLB_len, client->signed_identity, NULL, 0, 0 },
-			{ "iBoot", client->t_iBoot, client->t_iBoot_len, client->signed_identity, NULL, 0, 0 },
-			{ "AppleLogo", client->t_AppleLogo, client->t_AppleLogo_len, client->signed_identity, NULL, 0, 0 },
-			{ "BatteryCharging0", client->t_BatteryCharging0, client->t_BatteryCharging0_len, client->signed_identity, NULL, 0, 0 },
-			{ "BatteryCharging1", client->t_BatteryCharging1, client->t_BatteryCharging1_len, client->signed_identity, NULL, 0, 0 },
-			{ "BatteryFull", client->t_BatteryFull, client->t_BatteryFull_len, client->signed_identity, NULL, 0, 0 },
-			{ "BatteryLow0", client->t_BatteryLow0, client->t_BatteryLow0_len, client->signed_identity, NULL, 0, 0 },
-			{ "BatteryLow1", client->t_BatteryLow1, client->t_BatteryLow1_len, client->signed_identity, NULL, 0, 0 },
-			{ "BatteryPlugin", client->t_BatteryPlugin, client->t_BatteryPlugin_len, client->signed_identity, NULL, 0, 0 },
-			{ "RecoveryMode", client->t_RecoveryMode, client->t_RecoveryMode_len, client->signed_identity, NULL, 0, 0 },
-			{ NULL, NULL, 0, NULL, NULL, 0 }
-		};
-		
-		struct ipsw_filename_component_map {
-			bool manifest;
-			bool payload;
-			const char *compname;
-		};
-		struct ipsw_filename_component_map ipsw_fn_comp[] = {
-			{ 0, 0, "AOP" },
-			{ 0, 0, "AVE" },
-			{ 0, 0, "Ap,SystemVolumeCanonicalMetadata" },
-			{ 0, 0, "DeviceTree" },
-			{ 0, 0, "Homer" },
-			{ 0, 0, "KernelCache" },
-			{ 0, 0, "Multitouch" },
-			{ 0, 0, "RestoreDeviceTree" },
-			{ 0, 0, "RestoreKernelCache" },
-			{ 0, 0, "RestoreLogo" },
-			{ 0, 0, "RestoreRamDisk" },
-			{ 0, 0, "RestoreSEP" },
-			{ 0, 0, "RestoreTrustCache" },
-			{ 0, 0, "SEP" },
-			{ 0, 0, "StaticTrustCache" },
-			{ 0, 0, "SystemVolume" },
-			{ 0, 0, "iBEC" },
-			{ 0, 0, "iBSS" },
-			{ 0, 0, NULL, }
-		};
-		
-		int i = 0;
-		while (mem_fn_comp[i].compname) {
-			if (mem_fn_comp[i].compdata && mem_fn_comp[i].comp_identity) {
-				if (verify_memory_firmware_component_hash(client,
-														  mem_fn_comp[i].comp_identity,
-														  mem_fn_comp[i].compname,
-														  mem_fn_comp[i].compdata,
-														  mem_fn_comp[i].compdata_len,
-														  mem_fn_comp[i].tss,
-														  mem_fn_comp[i].manifest,
-														  mem_fn_comp[i].payload))
-				{
-					return -1;
-				}
-			}
-			i++;
-		}
-		i = 0;
-		while (ipsw_fn_comp[i].compname) {
-			if (verify_ipsw_firmware_component_hash(client, build_identity,
-													ipsw_fn_comp[i].compname,
-													ipsw_fn_comp[i].manifest,
-													ipsw_fn_comp[i].payload))
-			{
-				return -1;
-			}
-			i++;
-		}
-		 */
 		return 0;
-	} /* FLAG_TETHERED */
+	}
 	
 	// it is untethered, so requires full verification
 	struct filename_component_map {
