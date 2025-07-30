@@ -210,6 +210,29 @@ struct idevicerestore_client_t {
 #endif
 };
 
+#ifdef HAVE_TURDUS_MERULA
+typedef struct {
+	uint32_t magic;         // 'bsep'
+	uint32_t total_size;    // total block size
+	uint32_t block_version; // block version
+	uint32_t block_size;    // block size
+	uint32_t undefined_0;
+	uint32_t undefined_1;
+	
+	uint64_t undefined_2;
+	uint16_t undefined_3;
+	uint16_t type;          // payload type
+	/* ... */
+} sep_block_t;
+
+#define BSEP_MAGIC (0x70657362)
+#define BSEP_VERSION_1 (1uLL)
+#define BSEP_TYPE_NONE (0)
+#define BSEP_TYPE_SHC  (1uLL << 0)
+#define BSEP_TYPE_PTE  (1uLL << 1)
+
+#endif
+
 extern struct idevicerestore_mode_t idevicerestore_modes[];
 
 extern int idevicerestore_debug;

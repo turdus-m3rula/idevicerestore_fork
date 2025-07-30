@@ -203,6 +203,7 @@ int pongo_shell(struct idevicerestore_client_t* idr_client,
 	const char *typestr = NULL;
 	
 	char* foundp = NULL;
+	char* endp = NULL;
 	int rv = 0;
 	uint32_t r32 = 0;
 	while (1) {
@@ -217,47 +218,53 @@ int pongo_shell(struct idevicerestore_client_t* idr_client,
 					if (catch) {
 						if (idr_client->get_shc_block || idr_client->get_pte_block) {
 							if (idr_client->get_shc_block) {
-								typestr = "shcblock";
+								typestr = "shcblock2";
 							}
 							else {
-								typestr = "pteblock";
+								typestr = "pteblock2";
 							}
-							foundp = (char*)strstr(buf + outpos, "DUMP_DATA:");
-							if (foundp && strstr(foundp, ":DUMP_END")) {
-								if (strlen(foundp) < 0x112) {
-									error("dump_block: string is too short\n");
-									goto bad;
-								}
-								debug("dump_block: found block string\n");
-								if (hexparse(save, (char*)(foundp + 10), 0x80) != 0) {
-									error("dump_block: bad string\n");
-									goto bad;
-								}
-								
-								{
-									// save block
-									char zfn[1024];
-									if (idr_client->cache_dir) {
-										strcpy(zfn, idr_client->cache_dir);
-										strcat(zfn, "/block");
-									} else {
-										strcpy(zfn, "block");
-									}
-									mkdir_with_parents(zfn, 0755);
-									snprintf(&zfn[0] + strlen(zfn), sizeof(zfn) - strlen(zfn), "/%" PRIu64 "-%s-%s-%s.bin", idr_client->ecid, idr_client->device->product_type, idr_client->version, typestr);
-									FILE *zf = fopen(zfn, "wb");
-									if (!zf) {
-										error("error opening %s\n", zfn);
+							foundp = (char*)strstr(buf + outpos, "DUMP2_DATA:");
+							if (foundp) {
+								endp = (char*)strstr(foundp, ":DUMP2_END");
+								if (endp) {
+									char* startptr = (char*)(foundp + 11);
+									size_t payload_size = ((uintptr_t)endp - (uintptr_t)startptr)/2;
+									if (payload_size > 0x2000) {
+										error("dump_block: overflow\n");
 										goto bad;
 									}
-									fwrite(save, 0x80, 1, zf);
-									fflush(zf);
-									fclose(zf);
-									info("%s.bin saved to '%s'\n", typestr, zfn);
-								}
-								catch = 0;
-								if (CURRENT_STAGE != SEND_RESET) {
-									return 0;
+									info("dump_block: size: %d bytes\n", (int)payload_size);
+									debug("dump_block: found block string\n");
+									if (hexparse(save, (char*)startptr, payload_size) != 0) {
+										error("dump_block: bad string\n");
+										goto bad;
+									}
+									
+									{
+										// save block
+										char zfn[1024];
+										if (idr_client->cache_dir) {
+											strcpy(zfn, idr_client->cache_dir);
+											strcat(zfn, "/block");
+										} else {
+											strcpy(zfn, "block");
+										}
+										mkdir_with_parents(zfn, 0755);
+										snprintf(&zfn[0] + strlen(zfn), sizeof(zfn) - strlen(zfn), "/%" PRIu64 "-%s-%s-%s.bin", idr_client->ecid, idr_client->device->product_type, idr_client->version, typestr);
+										FILE *zf = fopen(zfn, "wb");
+										if (!zf) {
+											error("error opening %s\n", zfn);
+											goto bad;
+										}
+										fwrite(save, payload_size, 1, zf);
+										fflush(zf);
+										fclose(zf);
+										info("%s.bin saved to '%s'\n", typestr, zfn);
+									}
+									catch = 0;
+									if (CURRENT_STAGE != SEND_RESET) {
+										return 0;
+									}
 								}
 							}
 						}
