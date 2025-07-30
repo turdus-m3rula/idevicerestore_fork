@@ -5086,49 +5086,50 @@ int check_firmware_components(struct idevicerestore_client_t* client, plist_t bu
 	}
 	
 	// it is untethered, so requires full verification
+#define IMG4_VALIDATE_NONE          (0)
+#define IMG4_VALIDATE_MANIFEST      (1u << 0)
+#define IMG4_VALIDATE_PAYLOAD       (1u << 1)
+#define IMG4_MANIFEST_MUST_MATCHED  (1u << 2)
+#define IMG4_PAYLOAD_MUST_MATCHED   (1u << 3)
+	
+#define IMG4_VALIDATE_ALL          (IMG4_VALIDATE_MANIFEST | IMG4_VALIDATE_PAYLOAD | IMG4_MANIFEST_MUST_MATCHED | IMG4_PAYLOAD_MUST_MATCHED)
+#define IMG4_VALIDATE_RESTORE      (IMG4_VALIDATE_MANIFEST | IMG4_MANIFEST_MUST_MATCHED | IMG4_PAYLOAD_MUST_MATCHED)
+	
 	struct filename_component_map {
-		bool manifest_validation;
-		bool manifest_match;
-		bool payload_validation;
-		bool payload_match;
+		uint32_t validate_flag;
 		const char *compname;
 	};
 	struct filename_component_map fn_comp[] = {
-		{ 1, 1, 1, 1, "AOP" },
-		{ 1, 1, 1, 1, "AVE" },
-		{ 1, 1, 1, 1, "Ap,SystemVolumeCanonicalMetadata" },
-		{ 1, 0, 1, 1, "AppleLogo" },
-		{ 1, 0, 1, 1, "BatteryCharging0" },
-		{ 1, 0, 1, 1, "BatteryCharging1" },
-		{ 1, 0, 1, 1, "BatteryFull" },
-		{ 1, 0, 1, 1, "BatteryLow0" },
-		{ 1, 0, 1, 1, "BatteryLow1" },
-		{ 1, 0, 1, 1, "BatteryPlugin" },
-		{ 1, 1, 1, 1, "DeviceTree" },
-		{ 1, 1, 1, 1, "Homer" },
-		{ 1, 1, 1, 1, "KernelCache" },
-		{ 1, 1, 1, 1, "LLB" },
-		{ 1, 0, 1, 1, "Liquid" },
-		{ 1, 1, 1, 1, "Multitouch" },
-		{ 1, 0, 1, 1, "RecoveryMode" },
-		{ 1, 0, 1, 1, "RestoreDeviceTree" },
-		{ 1, 0, 1, 1, "RestoreKernelCache" },
-		{ 1, 0, 1, 1, "RestoreLogo" },
-		{ 1, 0, 1, 1, "RestoreRamDisk" },
-		{ 1, 0, 1, 1, "RestoreSEP" },
-		{ 1, 0, 1, 1, "RestoreTrustCache" },
-		{ 1, 1, 1, 1, "SEP" },
-		{ 1, 1, 1, 1, "StaticTrustCache" },
-		{ 1, 1, 1, 1, "SystemVolume" },
-		{ 1, 0, 1, 1, "iBEC" },
-		{ 1, 0, 1, 1, "iBSS" },
-		{ 1, 1, 1, 1, "iBoot" },
-		//{ 0, 0, "ftap" },
-		//{ 0, 0, "ftsp" },
-		//{ 0, 0, "rfta" },
-		//{ 0, 0, "rfts" },
-		//{ 1, 1, "OS" },
-		{ 0, 0, NULL, }
+		{ IMG4_VALIDATE_ALL,     "AOP" },
+		{ IMG4_VALIDATE_ALL,     "AVE" },
+		{ IMG4_VALIDATE_ALL,     "Ap,SystemVolumeCanonicalMetadata" },
+		{ IMG4_VALIDATE_ALL,     "AppleLogo" },
+		{ IMG4_VALIDATE_ALL,     "BatteryCharging0" },
+		{ IMG4_VALIDATE_ALL,     "BatteryCharging1" },
+		{ IMG4_VALIDATE_ALL,     "BatteryFull" },
+		{ IMG4_VALIDATE_ALL,     "BatteryLow0" },
+		{ IMG4_VALIDATE_ALL,     "BatteryLow1" },
+		{ IMG4_VALIDATE_ALL,     "BatteryPlugin" },
+		{ IMG4_VALIDATE_ALL,     "DeviceTree" },
+		{ IMG4_VALIDATE_ALL,     "Homer" },
+		{ IMG4_VALIDATE_ALL,     "KernelCache" },
+		{ IMG4_VALIDATE_ALL,     "LLB" },
+		{ IMG4_VALIDATE_ALL,     "Liquid" },
+		{ IMG4_VALIDATE_ALL,     "Multitouch" },
+		{ IMG4_VALIDATE_ALL,     "RecoveryMode" },
+		{ IMG4_VALIDATE_RESTORE, "RestoreDeviceTree" },
+		{ IMG4_VALIDATE_RESTORE, "RestoreKernelCache" },
+		{ IMG4_VALIDATE_RESTORE, "RestoreLogo" },
+		{ IMG4_VALIDATE_RESTORE, "RestoreRamDisk" },
+		{ IMG4_VALIDATE_RESTORE, "RestoreSEP" },
+		{ IMG4_VALIDATE_RESTORE, "RestoreTrustCache" },
+		{ IMG4_VALIDATE_ALL,     "SEP" },
+		{ IMG4_VALIDATE_ALL,     "StaticTrustCache" },
+		{ IMG4_VALIDATE_ALL,     "SystemVolume" },
+		{ IMG4_VALIDATE_RESTORE, "iBEC" },
+		{ IMG4_VALIDATE_RESTORE, "iBSS" },
+		{ IMG4_VALIDATE_ALL,     "iBoot" },
+		{ IMG4_VALIDATE_NONE,     NULL }
 	};
 	
 	uint32_t result = 0;
@@ -5138,24 +5139,24 @@ int check_firmware_components(struct idevicerestore_client_t* client, plist_t bu
 		result = 0;
 		res = validate_ipsw_firmware_component_hash(client, build_identity,
 													fn_comp[i].compname,
-													fn_comp[i].manifest_validation,
-													fn_comp[i].payload_validation, &result);
+													(fn_comp[i].validate_flag & IMG4_VALIDATE_MANIFEST) ? 1 : 0,
+													(fn_comp[i].validate_flag & IMG4_VALIDATE_PAYLOAD) ? 1 : 0,
+													&result);
 		
-		debug("image validation result: %d:%08x [comp: %s, manifest: %d:%d, payload: %d:%d]\n",
+		debug("image validation result: %d:%08x [comp: %s, flag: %08x]\n",
 			  res, result,
 			  fn_comp[i].compname,
-			  fn_comp[i].manifest_validation, fn_comp[i].manifest_match,
-			  fn_comp[i].payload_validation, fn_comp[i].payload_match);
+			  fn_comp[i].validate_flag);
 		
 		switch (res) {
 			case 0: // valid
-				if (fn_comp[i].manifest_match) {
+				if (fn_comp[i].validate_flag & IMG4_MANIFEST_MUST_MATCHED) {
 					if (!(result & IMG4_DIGEST_MATCHED_MANIFEST)) {
 						error("failed to image4 manifest check [comp: %s, res: %08x]\n", fn_comp[i].compname, result);
 						return -1;
 					}
 				}
-				if (fn_comp[i].payload_match) {
+				if (fn_comp[i].validate_flag & IMG4_PAYLOAD_MUST_MATCHED) {
 					if (!(result & IMG4_DIGEST_MATCHED_PAYLOAD)) {
 						error("failed to image4 payload check [comp: %s, res: %08x]\n", fn_comp[i].compname, result);
 						return -1;
@@ -5167,7 +5168,7 @@ int check_firmware_components(struct idevicerestore_client_t* client, plist_t bu
 				break;
 				
 			case 2: // not in im4p
-				if (fn_comp[i].manifest_match) {
+				if (fn_comp[i].validate_flag & IMG4_MANIFEST_MUST_MATCHED) {
 					error("image4 manifest check is required, but digest not found from manifest [comp: %s]\n", fn_comp[i].compname);
 					return -1;
 				}
