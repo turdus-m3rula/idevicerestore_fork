@@ -250,7 +250,7 @@ int pongo_shell(struct idevicerestore_client_t* idr_client,
 											strcpy(zfn, "block");
 										}
 										mkdir_with_parents(zfn, 0755);
-										snprintf(&zfn[0] + strlen(zfn), sizeof(zfn) - strlen(zfn), "/%" PRIu64 "-%s-%s-%s.bin", idr_client->ecid, idr_client->device->product_type, idr_client->version, typestr);
+										snprintf(&zfn[0] + strlen(zfn), sizeof(zfn) - strlen(zfn), "/%" PRIu64 "-%s-%s-restore-%s.bin", idr_client->ecid, idr_client->device->product_type, idr_client->version, typestr);
 										FILE *zf = fopen(zfn, "wb");
 										if (!zf) {
 											error("error opening %s\n", zfn);
