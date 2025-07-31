@@ -1514,7 +1514,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 					return -1;
 				}
 			}
-			if (client->sep_fwload_race) {
+			if (client->sep_fwload_race || (client->flags & FLAG_TETHERED)) {
 				if (!client->rsepfw) {
 					error("ERROR: Could not find selected RestoreSEP\n");
 					return -1;
@@ -1860,7 +1860,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 			}
 			
 			// SEPFW
-			if (client->sep_fwload_race) {
+			if (client->sep_fwload_race || (client->flags & FLAG_TETHERED)) {
 				if (client->signed_identity) {
 					if (!fragment) {
 						error("ERROR: Could not open fragmentzip information\n");
@@ -2702,7 +2702,7 @@ debug("%s length: %zu\n", #name, client->t_##name##_len); \
 				}
 				
 				// boot_tz0 race is possible even without a valid SEP image
-				if (client->sep_fwload_race) {
+				if (client->sep_fwload_race || (client->flags & FLAG_TETHERED)) {
 					if (!client->rsepfw || !client->signed_identity) {
 						error("ERROR: Could not find information about RestoreSEP\n");
 						return -1;
