@@ -2206,6 +2206,9 @@ debug("%s length: %zu\n", #name, client->t_##name##_len); \
 	
 #ifdef HAVE_TURDUS_MERULA
 	if (client->flags & FLAG_DOWNGRADE && client->get_pte_block && !client->sep_fwload_race) {
+		error("ERROR: This option is currently not supported in this version.\n");
+		return -1;
+		/* TODO: deprecated
 		if (client->flags & FLAG_INTERACTIVE) {
 			char input[64];
 			printf("################################ [ WARNING ] #################################\n"
@@ -2230,6 +2233,7 @@ debug("%s length: %zu\n", #name, client->t_##name##_len); \
 				}
 			}
 		}
+		 */
 	}
 #endif
 	idevicerestore_progress(client, RESTORE_STEP_PREPARE, 0.0);
@@ -5141,11 +5145,85 @@ int check_firmware_components(struct idevicerestore_client_t* client, plist_t bu
 		{ IMG4_VALIDATE_NONE,     NULL }
 	};
 	
+	int bypass_trustcache_check = 0;
+	{
+		// check Manifest hash
+		uint8_t* im4m_data = NULL;
+		uint64_t im4m_data_len = 0;
+		uint8_t* hash = NULL;
+		size_t hash_len = 0;
+		plist_t tss_data = plist_copy(client->local_shsh);
+		if (!tss_data) {
+			error("ERROR: local TSS data not found\n");
+			return -1;
+		}
+		plist_t apimg4ticket = plist_dict_get_item(tss_data, "ApImg4Ticket");
+		if (!apimg4ticket) {
+			error("ERROR: no ApImg4Ticket dict\n");
+			plist_free(tss_data);
+			return -1;
+		}
+		plist_get_data_val(apimg4ticket, (char**)&im4m_data, &im4m_data_len);
+		if (!im4m_data) {
+			error("ERROR: no img4 manifest\n");
+			plist_free(tss_data);
+			return -1;
+		}
+		if (get_image4_manifest_hash(im4m_data, im4m_data_len, 'rdsk', &hash, &hash_len) == 0) {
+			info("Found RestoreRamdisk digest\n");
+            debug("DGST: ");
+            int i;
+            for (i = 0; i < hash_len; i++) {
+                debug("%02x", hash[i]);
+            }
+            debug("\n");
+			if (hash_len == 0x14) {
+				uint8_t ota_rdsk_16A366[0x14] = {
+					0x81, 0x4D, 0xEA, 0x13, 0xEE, 0x34, 0xB3, 0x44, 0x52, 0x78, 0x02, 0xAA, 0x66, 0x6E, 0x75, 0xEB, 0x18, 0x81, 0x7C, 0xBF
+				};
+				uint8_t ota_rdsk_16A404[0x14] = {
+					0xE1, 0xAA, 0x8F, 0xA1, 0x35, 0x5C, 0x9E, 0x97, 0x76, 0x97, 0xC6, 0x10, 0xC7, 0xA7, 0x19, 0x7C, 0x3E, 0x5A, 0x93, 0xDE
+				};
+				if (memcmp(hash, ota_rdsk_16A366, 0x14) == 0 || memcmp(hash, ota_rdsk_16A404, 0x14) == 0) {
+					info("Found the weird image4 manifest\n");
+					bypass_trustcache_check = 1;
+				}
+			}
+			else if (hash_len == 0x30) {
+				uint8_t ota_rdsk_16A366[0x30] = {
+					0xEF, 0xC8, 0x07, 0x47, 0xB6, 0xF1, 0xC5, 0x1B, 0x6B, 0xC9, 0xB5, 0x00, 0x92, 0x14, 0xF6, 0x6F,
+					0x6F, 0x6A, 0x4C, 0x58, 0x9E, 0xA9, 0x55, 0x62, 0x7A, 0x0F, 0x39, 0x97, 0x11, 0x75, 0x21, 0xD2,
+					0xA3, 0xE7, 0xA3, 0x79, 0x54, 0xDD, 0xC1, 0x4C, 0x85, 0xF0, 0x44, 0x6A, 0xFC, 0x4D, 0x61, 0x61
+				};
+				uint8_t ota_rdsk_16A404[0x30] = {
+					0x97, 0xE9, 0x91, 0x48, 0x90, 0x4E, 0x57, 0xC5, 0xF7, 0x65, 0xA8, 0x0A, 0x0C, 0x00, 0x9A, 0xE5,
+					0xAC, 0xD1, 0x2E, 0x6C, 0x14, 0x89, 0x9C, 0xE6, 0xEF, 0x88, 0x0F, 0x14, 0xFD, 0x5C, 0x86, 0x0D,
+					0x23, 0x70, 0x38, 0x93, 0x5F, 0x8E, 0x6D, 0x78, 0x5E, 0x80, 0x5D, 0x47, 0xDD, 0xBF, 0xD2, 0xC2
+				};
+				if (memcmp(hash, ota_rdsk_16A366, 0x30) == 0 || memcmp(hash, ota_rdsk_16A404, 0x30) == 0) {
+					info("Found the weird image4 manifest\n");
+					bypass_trustcache_check = 1;
+				}
+			}
+		}
+		
+		if (tss_data) plist_free(tss_data);
+		if (im4m_data) free(im4m_data);
+		if (hash) free(hash);
+	}
 	uint32_t result = 0;
 	int res = 0;
 	int i = 0;
 	while (fn_comp[i].compname) {
 		result = 0;
+		if (bypass_trustcache_check) {
+			if (!strcmp(fn_comp[i].compname, "RestoreTrustCache")) {
+				goto skip_validate;
+			}
+			if (!strcmp(fn_comp[i].compname, "StaticTrustCache")) {
+				fn_comp[i].validate_flag = IMG4_VALIDATE_PAYLOAD | IMG4_PAYLOAD_MUST_MATCHED;
+			}
+		}
 		res = validate_ipsw_firmware_component_hash(client, build_identity,
 													fn_comp[i].compname,
 													(fn_comp[i].validate_flag & IMG4_VALIDATE_MANIFEST) ? 1 : 0,
@@ -5187,6 +5265,7 @@ int check_firmware_components(struct idevicerestore_client_t* client, plist_t bu
 				return -1;
 		}
 		
+	skip_validate:
 		i++;
 	}
 	

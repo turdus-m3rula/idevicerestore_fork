@@ -1829,4 +1829,54 @@ err:
 	if (mhash) free(mhash);
 	return rv;
 }
+
+int get_image4_manifest_hash(const uint8_t* manifest, const size_t manifest_len, uint32_t type, uint8_t** hash, size_t* hash_len)
+{
+	int rv = -16;
+	uint8_t* mhash = NULL;
+	size_t mhash_len = 0;
+	
+	if (!manifest || !manifest_len || !type) {
+		return rv;
+	}
+	
+	DERItem tmp = { .data = (DERByte *)manifest, .length = manifest_len };
+	TheImg4Manifest m;
+	if (DERImg4DecodeManifest(&tmp, &m)) {
+		error("ERROR: Failed to decode image4 manifest\n");
+		rv = -26;
+		goto err;
+	}
+	
+	if (Img4ManifestGetDigest(&m, type, (DERByte **)&mhash, (DERSize *)&mhash_len)) {
+		info("Failed to get digest from image4 manifest\n");
+		rv = 2;
+		goto err;
+	}
+	
+	if (mhash_len > 0x30) {
+		error("ERROR: Too large hash size\n");
+		rv = -28;
+		goto err;
+	}
+	
+	if (hash && hash_len) {
+		uint8_t* _hash = malloc(mhash_len);
+		if (!_hash) {
+			error("ERROR: malloc failed\n");
+			rv = -28;
+			goto err;
+		}
+		memcpy(_hash, mhash, mhash_len);
+		*hash = _hash;
+		*hash_len = mhash_len;
+	}
+	
+	rv = 0;
+	
+err:
+	if (mhash) free(mhash);
+	return rv;
+}
+
 #endif
