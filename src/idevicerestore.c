@@ -744,6 +744,12 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 		if (client->sep_shellcode_block && client->sep_shellcode_block_len) {
 			if (client->sep_shellcode_block_len == 0x80) {
 				info("INFO: This block is old version!\n");
+				uint8_t zero[0x10] = { 0 };
+				memset(zero, 0, 0x10);
+				if (memcmp(client->sep_shellcode_block + 0x30, zero, 0x10) || memcmp(client->sep_shellcode_block + 0x70, zero, 0x10)) {
+					error("ERROR: block type check failed!\n");
+					return -2;
+				}
 			}
 			else {
 				info("Checking block type\n");
