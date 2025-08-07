@@ -130,7 +130,8 @@ static void usage(int argc, char* argv[], int err)
 	
 #ifdef HAVE_TURDUS_MERULA
 #define TURDUS_MERULA_FLAG_LINE "\nDowngrade options:\n" \
-	"  -w, --downgrade           Downgrade with a custom firmware\n" \
+	"  -w, --downgrade           Downgrade with a custom firmware with shsh\n" \
+	"  -o, --tethered            Downgrade with a custom firmware without shsh\n" \
 	"  -j, --boot-pongo          Just boot pongoOS with restore chain\n" \
 	"  --load-shsh PATH          Use file at PATH as custom shsh\n" \
 	"  --load-shcblock PATH      Set SEP shellcode ciphertext block for A9 - A9X devices\n" \
