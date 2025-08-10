@@ -727,6 +727,30 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 				}
 			}
 		}
+		else if (client->cpid == 0x7000 || client->cpid == 0x7001) {
+			error("ERROR: Unsupported device (CPID: %04x)\n", client->cpid);
+			return -2;
+			// DEBUG
+			/*
+			if (client->sep_fwload_race) {
+				error("ERROR: fwload race is not supported for this device for now.\n");
+				return -2;
+			}
+			debug("Found supported device (CPID: %04x)\n", client->cpid);
+			if (!(client->flags & FLAG_BOOT_PONGO)) {
+				if (!client->sep_boot_tz0_race) {
+					error("ERROR: No exploit method selected\n");
+					return -2;
+				}
+			}
+			if (client->flags & FLAG_BOOT_PONGO) {
+				if (client->sep_boot_tz0_race) {
+					error("ERROR: boot_tz0 race is not supported in pongoOS boot mode.\n");
+					return -2;
+				}
+			}
+			*/
+		}
 		else {
 			error("ERROR: Unsupported device (CPID: %04x)\n", client->cpid);
 			return -2;
@@ -1496,7 +1520,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 		
 		if (client->use_specific_fwver_component) {
 			if (client->build_major == 13) {
-				if (client->cpid == 0x8000 || client->cpid == 0x8001 || client->cpid == 0x8003) {
+				if (client->cpid == 0x7000 || client->cpid == 0x7001 || client->cpid == 0x8000 || client->cpid == 0x8001 || client->cpid == 0x8003) {
 					error("ERROR: This option is not supported for this device\n");
 					return -1;
 				}
@@ -1950,7 +1974,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 		client->alternative_ibss_len = 0;
 		if (client->signed_manifest) {
 			if (client->build_major == 13) {
-				if (client->cpid == 0x8000 || client->cpid == 0x8001 || client->cpid == 0x8003) {
+				if (client->cpid == 0x7000 || client->cpid == 0x7001 || client->cpid == 0x8000 || client->cpid == 0x8001 || client->cpid == 0x8003) {
 					// use alternative ibss
 					if (!fragment) {
 						error("ERROR: Could not open fragmentzip information\n");
@@ -2207,9 +2231,14 @@ debug("%s length: %zu\n", #name, client->t_##name##_len); \
 	
 #ifdef HAVE_TURDUS_MERULA
 	if (client->flags & FLAG_DOWNGRADE && client->get_pte_block && !client->sep_fwload_race) {
-		error("ERROR: This option is currently not supported in this version.\n");
-		return -1;
-		/* TODO: deprecated
+		if (client->cpid == 0x7000 || client->cpid == 0x7001) {
+			// DEBUG: PASS
+		}
+		else {
+			error("ERROR: This option is currently not supported in this version.\n");
+			return -1;
+		}
+		// TODO: deprecated
 		if (client->flags & FLAG_INTERACTIVE) {
 			char input[64];
 			printf("################################ [ WARNING ] #################################\n"
@@ -2234,7 +2263,6 @@ debug("%s length: %zu\n", #name, client->t_##name##_len); \
 				}
 			}
 		}
-		 */
 	}
 #endif
 	idevicerestore_progress(client, RESTORE_STEP_PREPARE, 0.0);
@@ -2844,7 +2872,7 @@ debug("%s length: %zu\n", #name, client->t_##name##_len); \
 					memset(client->img4_manifest_hash, 0, client->img4_manifest_hash_len);
 					memcpy(client->img4_manifest_hash, tsha384, SHA384_DIGEST_LENGTH);
 				}
-				else if (client->cpid == 0x8000 || client->cpid == 0x8001 || client->cpid == 0x8003) {
+				else if (client->cpid == 0x7000 || client->cpid == 0x7001 || client->cpid == 0x8000 || client->cpid == 0x8001 || client->cpid == 0x8003) {
 					unsigned char tsha1[SHA1_DIGEST_LENGTH];
 					memset(tsha1, 0, SHA1_DIGEST_LENGTH);
 					sha1_context sha1ctx;

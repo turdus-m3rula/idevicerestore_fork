@@ -1506,7 +1506,7 @@ static int get_im4p_hash(struct idevicerestore_client_t* client, const char *com
 		memset(_hash, 0, _hash_len);
 		memcpy(_hash, tsha384, SHA384_DIGEST_LENGTH);
 	}
-	else if (client->cpid == 0x8000 || client->cpid == 0x8001 || client->cpid == 0x8003) {
+	else if (client->cpid == 0x7000 || client->cpid == 0x7001 || client->cpid == 0x8000 || client->cpid == 0x8001 || client->cpid == 0x8003) {
 		unsigned char tsha1[SHA1_DIGEST_LENGTH];
 		memset(tsha1, 0, SHA1_DIGEST_LENGTH);
 		sha1_context sha1ctx;

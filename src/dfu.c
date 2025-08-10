@@ -163,7 +163,7 @@ int dfu_send_component(struct idevicerestore_client_t* client, plist_t build_ide
 #ifdef HAVE_TURDUS_MERULA
 		if (!strcmp(component, "iBSS") &&
 			(client->build_major == 13) &&
-			(client->cpid == 0x8000 || client->cpid == 0x8001 || client->cpid == 0x8003) &&
+			(client->cpid == 0x7000 || client->cpid == 0x7001 || client->cpid == 0x8000 || client->cpid == 0x8001 || client->cpid == 0x8003) &&
 			(client->alternative_ibss && (client->alternative_ibss_len != 0))) {
 			component_size = client->alternative_ibss_len;
 			component_data = malloc(component_size);
@@ -763,7 +763,7 @@ int dfu_enter_recovery(struct idevicerestore_client_t* client, plist_t build_ide
 #ifdef HAVE_TURDUS_MERULA
 	int retry = 0;
 	if ((client->flags & FLAG_DOWNGRADE) &&
-		(client->cpid == 0x8000 || client->cpid == 0x8001 || client->cpid == 0x8003)) {
+		(client->cpid == 0x7000 || client->cpid == 0x7001 || client->cpid == 0x8000 || client->cpid == 0x8001 || client->cpid == 0x8003)) {
 		debug("Waiting for device to reconnect in yolo (checkra1n) DFU mode...\n");
 		info("If there is no response after a few seconds, please unplug and replug the lightning cable manually.\n");
 		cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 1000000);
@@ -816,7 +816,7 @@ int dfu_enter_recovery(struct idevicerestore_client_t* client, plist_t build_ide
 		mutex_unlock(&client->device_event_mutex);
 		if (!(client->flags & FLAG_QUIT)) {
 #ifdef HAVE_TURDUS_MERULA
-			if ((client->flags & FLAG_DOWNGRADE) && (client->cpid == 0x8000 || client->cpid == 0x8001 || client->cpid == 0x8003)) {
+			if ((client->flags & FLAG_DOWNGRADE) && (client->cpid == 0x7000 || client->cpid == 0x7001 || client->cpid == 0x8000 || client->cpid == 0x8001 || client->cpid == 0x8003)) {
 				error("ERROR: Device did not reconnect in recovery mode. Possibly failed to upload pongo. Reset device and try again.\n");
 			}
 			else {
