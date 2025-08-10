@@ -1519,7 +1519,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 		}
 		
 		if (client->use_specific_fwver_component) {
-			if (client->build_major == 13) {
+			if (client->build_major <= 13) {
 				if (client->cpid == 0x7000 || client->cpid == 0x7001 || client->cpid == 0x8000 || client->cpid == 0x8001 || client->cpid == 0x8003) {
 					error("ERROR: This option is not supported for this device\n");
 					return -1;
@@ -1973,7 +1973,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 		client->alternative_ibss = NULL;
 		client->alternative_ibss_len = 0;
 		if (client->signed_manifest) {
-			if (client->build_major == 13) {
+			if (client->build_major <= 13) {
 				if (client->cpid == 0x7000 || client->cpid == 0x7001 || client->cpid == 0x8000 || client->cpid == 0x8001 || client->cpid == 0x8003) {
 					// use alternative ibss
 					if (!fragment) {
@@ -2124,6 +2124,7 @@ debug("%s length: %zu\n", #name, client->t_##name##_len); \
 	if (client->flags & FLAG_TETHERED) {
 		int is_supported_version = 0;
 		if (
+		/*	client->build_major == 12 ||*/
 			client->build_major == 13 ||
 			client->build_major == 14 ||
 			client->build_major == 15 ||

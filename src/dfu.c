@@ -162,7 +162,7 @@ int dfu_send_component(struct idevicerestore_client_t* client, plist_t build_ide
 
 #ifdef HAVE_TURDUS_MERULA
 		if (!strcmp(component, "iBSS") &&
-			(client->build_major == 13) &&
+			(client->build_major <= 13) &&
 			(client->cpid == 0x7000 || client->cpid == 0x7001 || client->cpid == 0x8000 || client->cpid == 0x8001 || client->cpid == 0x8003) &&
 			(client->alternative_ibss && (client->alternative_ibss_len != 0))) {
 			component_size = client->alternative_ibss_len;
