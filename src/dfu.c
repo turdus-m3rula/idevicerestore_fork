@@ -701,7 +701,7 @@ int dfu_enter_recovery(struct idevicerestore_client_t* client, plist_t build_ide
 		}
 
 #ifdef HAVE_TURDUS_MERULA
-		if (client->flags & FLAG_DOWNGRADE) {
+		if ((client->flags & FLAG_DOWNGRADE) && client->is_32bit_soc != 1) {
 			info("Checking boot-nonce hash\n");
 			int hashr = validate_boot_nonce_hash(client);
 			if (hashr) {
@@ -763,6 +763,7 @@ int dfu_enter_recovery(struct idevicerestore_client_t* client, plist_t build_ide
 #ifdef HAVE_TURDUS_MERULA
 	int retry = 0;
 	if ((client->flags & FLAG_DOWNGRADE) &&
+		client->is_32bit_soc != 1 &&
 		(client->cpid == 0x7000 || client->cpid == 0x7001 || client->cpid == 0x8000 || client->cpid == 0x8001 || client->cpid == 0x8003)) {
 		debug("Waiting for device to reconnect in yolo (checkra1n) DFU mode...\n");
 		info("If there is no response after a few seconds, please unplug and replug the lightning cable manually.\n");
@@ -816,7 +817,9 @@ int dfu_enter_recovery(struct idevicerestore_client_t* client, plist_t build_ide
 		mutex_unlock(&client->device_event_mutex);
 		if (!(client->flags & FLAG_QUIT)) {
 #ifdef HAVE_TURDUS_MERULA
-			if ((client->flags & FLAG_DOWNGRADE) && (client->cpid == 0x7000 || client->cpid == 0x7001 || client->cpid == 0x8000 || client->cpid == 0x8001 || client->cpid == 0x8003)) {
+			if ((client->flags & FLAG_DOWNGRADE) &&
+				client->is_32bit_soc != 1 &&
+				(client->cpid == 0x7000 || client->cpid == 0x7001 || client->cpid == 0x8000 || client->cpid == 0x8001 || client->cpid == 0x8003)) {
 				error("ERROR: Device did not reconnect in recovery mode. Possibly failed to upload pongo. Reset device and try again.\n");
 			}
 			else {

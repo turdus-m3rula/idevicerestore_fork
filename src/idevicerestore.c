@@ -751,10 +751,22 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 			}
 			*/
 		}
+		else if (client->cpid == 0x8950 || client->cpid == 0x8955) {
+			client->is_32bit_soc = 1;
+			if (client->sep_boot_tz0_race || client->sep_fwload_race) {
+				error("ERROR: This device does not have the SEP.\n");
+				return -2;
+			}
+			if (client->flags & FLAG_BOOT_PONGO) {
+				error("ERROR: This device does not support pongoOS.\n");
+				return -2;
+			}
+		}
 		else {
 			error("ERROR: Unsupported device (CPID: %04x)\n", client->cpid);
 			return -2;
 		}
+		
 		if (client->get_shc_block || client->get_pte_block) {
 			if (client->cpid == 0x8010 || client->cpid == 0x8011) {
 				error("ERROR: This device does not requires SEP ciphertext block\n");
@@ -2124,7 +2136,9 @@ debug("%s length: %zu\n", #name, client->t_##name##_len); \
 	if (client->flags & FLAG_TETHERED) {
 		int is_supported_version = 0;
 		if (
-		/*	client->build_major == 12 ||*/
+			client->build_major == 10 ||
+			client->build_major == 11 ||
+			client->build_major == 12 ||
 			client->build_major == 13 ||
 			client->build_major == 14 ||
 			client->build_major == 15 ||
@@ -2345,7 +2359,7 @@ debug("%s length: %zu\n", #name, client->t_##name##_len); \
 	idevicerestore_progress(client, RESTORE_STEP_PREPARE, 0.2);
 
 #ifdef HAVE_TURDUS_MERULA
-	if (client->flags & FLAG_DOWNGRADE) {
+	if ((client->flags & FLAG_DOWNGRADE) && client->is_32bit_soc != 1) {
 		if (!(client->flags & FLAG_BOOT_PONGO)) {
 			// checks the hashes of several important firmware components
 			info("Checking hashes...\n");
@@ -2353,7 +2367,6 @@ debug("%s length: %zu\n", #name, client->t_##name##_len); \
 				return -1;
 			}
 		}
-		
 	}
 #endif
 	
@@ -2685,7 +2698,7 @@ debug("%s length: %zu\n", #name, client->t_##name##_len); \
 	// now finally do the magic to put the device into restore mode
 	if (client->mode == MODE_RECOVERY) {
 #ifdef HAVE_TURDUS_MERULA
-		if (client->flags & FLAG_DOWNGRADE) {
+		if ((client->flags & FLAG_DOWNGRADE) && client->is_32bit_soc != 1) {
 			if (!(client->flags & FLAG_BOOT_PONGO) || (client->sep_fwload_race && client->get_pte_block)) {
 				// extract sep im4p
 				if (client->sep_fwload_race || (client->flags & FLAG_TETHERED)) {
@@ -2842,7 +2855,7 @@ debug("%s length: %zu\n", #name, client->t_##name##_len); \
 		cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 100000000);
 		
 #ifdef HAVE_TURDUS_MERULA
-		if (client->flags & FLAG_DOWNGRADE) {
+		if ((client->flags & FLAG_DOWNGRADE) && client->is_32bit_soc != 1) {
 			// allocate image4 manifest
 				if (!client->local_shsh) {
 					error("no local shsh buffer\n");

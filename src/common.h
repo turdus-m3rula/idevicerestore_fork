@@ -143,6 +143,7 @@ struct idevicerestore_client_t {
     
 #ifdef HAVE_TURDUS_MERULA
 	int disable_serial_output;
+	int is_32bit_soc;
 	uint16_t cpid;
 	uint8_t bdid;
 	plist_t local_shsh;

@@ -464,6 +464,8 @@ int img4_stitch_component(const char* component_name, const unsigned char* compo
 			memcpy((void*)tag, "rlgo", 4);
 		} else if (strcmp(component_name, "iBootTethered2") == 0) {
 			memcpy((void*)tag, "ibss", 4);
+		} else if (strcmp(component_name, "iBoot32Tethered") == 0) {
+			memcpy((void*)tag, "ibob", 4);
 		} else if (strcmp(component_name, "SEPTethered") == 0) {
 			memcpy((void*)tag, "sepi", 4);
 		}

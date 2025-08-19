@@ -1812,6 +1812,9 @@ memcpy(component_data, client->t_##name, component_size); \
 				if (client->cpid == 0x8010 || client->cpid == 0x8011) {
 					my_comp_name = "iBootTethered2";
 				}
+				if (client->cpid == 0x8950 || client->cpid == 0x8955) {
+					my_comp_name = "iBoot32Tethered";
+				}
 				if (personalize_component(client, my_comp_name, component_data, component_size, client->tss, &nor_data, &nor_size) < 0) {
 					free(iter);
 					free(comp);
