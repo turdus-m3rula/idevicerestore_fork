@@ -1824,7 +1824,12 @@ memcpy(component_data, client->t_##name, component_size); \
 					error("ERROR: Unable to get personalized component: %s\n", my_comp_name);
 					return -1;
 				}
-                
+				if (client->cpid == 0x8950 || client->cpid == 0x8955) {
+					uint8_t* magic = (uint8_t*)nor_data;
+					magic[0x10] = 0x62;
+					magic[0x20] = 0x62;
+				}
+				
 				free(component_data);
 				component_data = NULL;
 				component_size = 0;

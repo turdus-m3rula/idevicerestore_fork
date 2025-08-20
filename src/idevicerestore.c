@@ -1903,7 +1903,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 			}
 			
 			// SEPFW
-			if (client->sep_fwload_race || (client->flags & FLAG_TETHERED)) {
+			if ((client->sep_fwload_race || (client->flags & FLAG_TETHERED)) && client->is_32bit_soc != 1) {
 				if (client->signed_identity) {
 					if (!fragment) {
 						error("ERROR: Could not open fragmentzip information\n");
