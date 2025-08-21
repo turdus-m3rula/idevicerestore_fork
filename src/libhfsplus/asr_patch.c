@@ -49,6 +49,10 @@ static void write_u32_le(void *p, uint32_t v)
 	b[3] = (unsigned char)((v >> 24) & 0xFFu);
 }
 
+// PF32
+// WARN: LE only
+// TODO: support big endian
+
 static uint32_t bit_range(uint32_t x, int start, int end)
 {
 	x = (x << (31 - start)) >> (31 - start);
