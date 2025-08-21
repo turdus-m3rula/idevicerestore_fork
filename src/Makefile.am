@@ -63,11 +63,6 @@ idevicerestore_SOURCES += \
 	libDER/oids.c libDER/oids.h \
 	libDER/asn1Types.h libDER/libDER_config.h libDER/libDER.h \
 	pongo.c pongo.h \
-	libhfsplus/asr_patch.c libhfsplus/asr_patch.h libhfsplus/hfs_patch_asr.h \
-	libhfsplus/common/abstractfile.c libhfsplus/common/abstractfile.h libhfsplus/common/libhfsplus-common.h \
-	libhfsplus/hfs/btree.c libhfsplus/hfs/catalog.c libhfsplus/hfs/extents.c libhfsplus/hfs/fastunicodecompare.c \
-	libhfsplus/hfs/flatfile.c libhfsplus/hfs/hfs.c libhfsplus/hfs/hfscompress.c libhfsplus/hfs/hfscompress.h libhfsplus/hfs/hfslib.c \
-	libhfsplus/hfs/hfslib.h libhfsplus/hfs/hfsplus.h libhfsplus/hfs/rawfile.c libhfsplus/hfs/utility.c libhfsplus/hfs/volume.c libhfsplus/hfs/xattr.c \
 	stuff/cpf_bin.c stuff/cpf_bin.h \
 	stuff/kpf_bin.c stuff/kpf_bin.h \
 	stuff/overlay_bin.c stuff/overlay_bin.h \
@@ -76,4 +71,12 @@ idevicerestore_SOURCES += \
 	stuff/union_bin.c stuff/union_bin.h
 idevicerestore_CFLAGS += -DHAVE_TURDUS_MERULA $(libDER_CFLAGS) $(libfragmentzip_CFLAGS)
 idevicerestore_LDFLAGS += $(libfragmentzip_LIBS)
+endif
+if HAVE_LIBHFSPLUS
+idevicerestore_SOURCES += \
+	libhfsplus/asr_patch.c libhfsplus/asr_patch.h libhfsplus/hfs_patch_asr.h \
+	libhfsplus/common/abstractfile.c libhfsplus/common/abstractfile.h libhfsplus/common/libhfsplus-common.h \
+	libhfsplus/hfs/btree.c libhfsplus/hfs/catalog.c libhfsplus/hfs/extents.c libhfsplus/hfs/fastunicodecompare.c \
+	libhfsplus/hfs/flatfile.c libhfsplus/hfs/hfs.c libhfsplus/hfs/hfscompress.c libhfsplus/hfs/hfscompress.h libhfsplus/hfs/hfslib.c \
+	libhfsplus/hfs/hfslib.h libhfsplus/hfs/hfsplus.h libhfsplus/hfs/rawfile.c libhfsplus/hfs/utility.c libhfsplus/hfs/volume.c libhfsplus/hfs/xattr.c
 endif

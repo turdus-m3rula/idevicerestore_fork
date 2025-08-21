@@ -173,6 +173,16 @@ if test "x$have_turdusmerula" = "xyes"; then
 fi
 AM_CONDITIONAL([HAVE_TURDUS_MERULA],[test "x$have_turdusmerula" = "xyes"])
 
+AC_ARG_WITH([libhfsplus],
+            [AS_HELP_STRING([--with-libhfsplus],
+            [build with support for libhfsplus (default is no)])],
+            [have_libhfsplus=$withval],
+            [have_libhfsplus=no])
+if test "x$have_libhfsplus" = "xyes"; then
+  AC_DEFINE(HAVE_LIBHFSPLUS, 1, [Define if libhfsplus support is available])
+fi
+AM_CONDITIONAL([HAVE_LIBHFSPLUS],[test "x$have_libhfsplus" = "xyes"])
+
 CFLAGS="$CACHED_CFLAGS"
 
 AC_SUBST(GLOBAL_CFLAGS)

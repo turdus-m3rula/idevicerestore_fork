@@ -35,7 +35,10 @@
 #include "img3.h"
 #include "restore.h"
 #include "recovery.h"
+
+#ifdef HAVE_LIBHFSPLUS
 #include "libhfsplus/hfs_patch_asr.h"
+#endif
 
 static int recovery_progress_callback(irecv_client_t client, const irecv_event_t* event)
 {
@@ -491,6 +494,7 @@ static int recovery_send_ramdisk_component(struct idevicerestore_client_t* clien
 	
 	if (client->flags & FLAG_TETHERED && client->is_32bit_soc == 1) {
 		if (client->build_major == 14) {
+#ifdef HAVE_LIBHFSPLUS
 			if (component_size < 0x40) {
 				error("ERROR: Too small component: %s\n", component);
 				return -1;
@@ -514,6 +518,10 @@ static int recovery_send_ramdisk_component(struct idevicerestore_client_t* clien
 					}
 				}
 			}
+#else
+			error("ERROR: Restoring to this version is not supported.\n");
+			return -1;
+#endif
 		}
 	}
 		
