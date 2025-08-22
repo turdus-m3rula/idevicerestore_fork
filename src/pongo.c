@@ -74,6 +74,38 @@ ptr = NULL; \
 } \
 }
 
+static inline uint64_t read_u64_le(const unsigned char *p)
+{
+	return (uint64_t)p[0] |
+	((uint64_t)p[1] << 8) |
+	((uint64_t)p[2] << 16) |
+	((uint64_t)p[3] << 24) |
+	((uint64_t)p[4] << 32) |
+	((uint64_t)p[5] << 40) |
+	((uint64_t)p[6] << 48) |
+	((uint64_t)p[7] << 56);
+}
+
+static inline void write_u32_le(uint8_t *buf, uint32_t value)
+{
+	buf[0] = (uint8_t)(value & 0xFFu);
+	buf[1] = (uint8_t)((value >> 8) & 0xFFu);
+	buf[2] = (uint8_t)((value >> 16) & 0xFFu);
+	buf[3] = (uint8_t)((value >> 24) & 0xFFu);
+}
+
+static inline void write_u64_le(uint8_t *buf, uint64_t value)
+{
+	buf[0] = (uint8_t)(value & 0xFFu);
+	buf[1] = (uint8_t)((value >> 8) & 0xFFu);
+	buf[2] = (uint8_t)((value >> 16) & 0xFFu);
+	buf[3] = (uint8_t)((value >> 24) & 0xFFu);
+	buf[4] = (uint8_t)((value >> 32) & 0xFFu);
+	buf[5] = (uint8_t)((value >> 40) & 0xFFu);
+	buf[6] = (uint8_t)((value >> 48) & 0xFFu);
+	buf[7] = (uint8_t)((value >> 56) & 0xFFu);
+}
+
 static int lz4_compress_and_add_shc(const void *inbuf, const size_t insize, void **outbuf, size_t *outsize)
 {
 	void* buffer = NULL;
@@ -107,8 +139,8 @@ static int lz4_compress_and_add_shc(const void *inbuf, const size_t insize, void
 	memcpy(buffer + lz4dec_bin_len, tmpbuf, outlen);
 	FREE(tmpbuf);
 	
-	uint32_t* sizebuf = (uint32_t*)(buffer + (lz4dec_bin_len - 4));
-	sizebuf[0] = outlen;
+	uint8_t* sizebuf = (uint8_t*)(buffer + (lz4dec_bin_len - 4));
+	write_u32_le(sizebuf, outlen);
 	
 	if (outbuf) *outbuf = buffer;
 	if (outsize) *outsize = outlen + 0x200;
@@ -117,18 +149,19 @@ static int lz4_compress_and_add_shc(const void *inbuf, const size_t insize, void
 
 static void patch_pongo(uint8_t* pongo, const size_t sz, int sigcheckPatch)
 {
-	uint8_t magicval[8] = {
-		0x00, 0x41, 0xbe, 0xba, 0xfe, 0xca, 0x37, 0x13
-	};
-
-	void* ptr = memmem((const void*)pongo, sz, magicval, sizeof(uint8_t) * 8);
-	if (ptr) {
-		uint64_t* magic = (uint64_t*)ptr;
-		uint64_t ipf_flag = IPF_NONE;
-		if (sigcheckPatch) {
-			ipf_flag |= IPF_SIG_CHECK_PATCH;
+	const uint64_t magicval = 0x1337cafebabe4100uLL;
+	uint64_t ipf_flag = IPF_NONE;
+	if (sigcheckPatch) {
+		ipf_flag |= IPF_SIG_CHECK_PATCH;
+	}
+	uint8_t* cur = pongo;
+	const uint8_t* end = (uint8_t*)(pongo + sz - sizeof(uint64_t));
+	while (cur <= end) {
+		if (read_u64_le(cur) == magicval) {
+			write_u64_le(cur, ipf_flag);
+			break;
 		}
-		magic[0] = ipf_flag;
+		cur += sizeof(uint64_t);
 	}
 }
 
