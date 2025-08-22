@@ -712,6 +712,15 @@ int dfu_enter_recovery(struct idevicerestore_client_t* client, plist_t build_ide
 				return -1;
 			}
 
+			info("Checking ECID\n");
+			int ecidr = validate_ECID(client);
+			if (ecidr) {
+				mutex_unlock(&client->device_event_mutex);
+				error("ERROR: ECID validation failed (err = %d)\n", ecidr);
+				irecv_close(client->dfu->client);
+				client->dfu->client = NULL;
+				return -1;
+			}
 			if (client->cpid == 0x8010 || client->cpid == 0x8011) {
 				if (!is_recovery) {
 					mutex_unlock(&client->device_event_mutex);

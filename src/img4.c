@@ -1290,6 +1290,27 @@ static int Img4DecodeGetPropertyData(const DERItem *a1, DERTag tag, DERByte **a4
 	return 0;
 }
 
+int Img4DecodeGetPropertyInteger64(const DERItem *a1, DERTag tag, uint64_t *value)
+{
+	int rv;
+	DERItem var_50;
+	DERMonster var_40[2];
+	
+	var_50.data = a1->data;
+	var_50.length = a1->length;
+	
+	rv = DERImg4DecodeProperty(&var_50, E000000000000000 | tag, var_40);
+	if (rv) {
+		return rv;
+	}
+	
+	if (var_40[1].tag != ASN1_INTEGER) {
+		return DR_UnexpectedTag;
+	}
+	
+	return DERParseInteger64(&var_40[1].item, value);
+}
+
 static int Img4ManifestGetDigest(const TheImg4Manifest *m, const unsigned int type, DERByte** hash, DERSize *hash_len)
 {
 	int rv;
@@ -1480,7 +1501,81 @@ static int Img4ManifestGetBootNonceHash(const TheImg4Manifest *m, DERByte** hash
 			if (hash_len) *hash_len = _hash_len;
 			return 0;
 		}
-		return -41;
+	}
+	return -42;
+}
+
+static int Img4ManifestGetECID(const TheImg4Manifest *m, uint64_t* ecid)
+{
+	int rv;
+	DERDecodedInfo var_88;
+	DERMonster var_70[2];
+	DERItem manb, manp, objp;
+	
+	rv = DERDecodeItem(&m->theset, &var_88);
+	if (rv) {
+		return rv;
+	}
+	if (var_88.tag != ASN1_CONSTR_SET) {
+		return -1;
+	}
+	
+	rv = DERImg4DecodeFindProperty(&var_88.content, (DERTag)(E000000000000000 | 'MANB'), ASN1_CONSTR_SET, var_70);
+	if (rv) {
+		return rv;
+	}
+	manb = var_70[1].item;
+	
+	rv = DERImg4DecodeFindProperty(&manb, (DERTag)(E000000000000000 | 'MANP'), ASN1_CONSTR_SET, var_70);
+	if (rv) {
+		return rv;
+	}
+	manp = var_70[1].item;
+	
+	objp = manp;
+	DERMonster var_98[2];
+	DERItem var_68;
+	DERSequence var_58;
+	DERDecodedInfo var_48;
+	rv = DERDecodeSeqContentInit(&objp, &var_58);
+	if (rv) {
+		return rv;
+	}
+	
+	while (1) {
+		rv = DERDecodeSeqNext(&var_58, &var_48);
+		if (rv == DR_EndOfSequence) {
+			return 0;
+		}
+		if (rv) {
+			return rv;
+		}
+		rv = DERImg4DecodeProperty(&var_48.content, var_48.tag, var_98);
+		if (rv) {
+			return rv;
+		}
+		
+		if (var_98[1].tag != ASN1_OCTET_STRING && var_98[1].tag != ASN1_INTEGER && var_98[1].tag != ASN1_BOOLEAN) {
+			return DR_UnexpectedTag;
+		}
+		
+		if ((var_48.tag & E000000000000000) == 0) {
+			return DR_UnexpectedTag;
+		}
+		
+		var_68.data = var_48.content.data;
+		var_68.length = var_48.content.length;
+		
+		if ((unsigned int)var_48.tag == 'ECID') {
+			uint64_t var_18 = 0;
+			rv = Img4DecodeGetPropertyInteger64(&var_68, var_48.tag, &var_18);
+			if (rv) {
+				return rv;
+			}
+			debug("manifest ECID: %016" PRIx64 "\n", var_18);
+			if (ecid) *ecid = var_18;
+			return 0;
+		}
 	}
 	return -42;
 }
@@ -1661,7 +1756,6 @@ int validate_boot_nonce_hash(struct idevicerestore_client_t* client)
 	
 	if (get_boot_nonce_hash_from_manifest(client, (const uint8_t*)im4m_data, (const size_t)im4m_data_len, &boot_nonce_hash, &nonce_hash_size)) {
 		error("ERROR: Unable to get boot-nonce hash from manifest\n");
-		free(tss_data);
 		rv = -5;
 		goto end;
 	}
@@ -1699,9 +1793,96 @@ int validate_boot_nonce_hash(struct idevicerestore_client_t* client)
 	rv = 0;
 	
 end:
-	if (tss_data) free(tss_data);
+	if (tss_data) plist_free(tss_data);
 	if (im4m_data) free(im4m_data);
 	if (boot_nonce_hash) free(boot_nonce_hash);
+	return rv;
+}
+
+static int get_ECID_from_manifest(struct idevicerestore_client_t* client, const uint8_t* manifest, const size_t manifest_len, uint64_t* ecid)
+{
+	int rv = -16;
+	
+	if (!client || !manifest || !manifest_len) {
+		return -16;
+	}
+	
+	DERItem tmp = { .data = (DERByte *)manifest, .length = manifest_len };
+	TheImg4Manifest m;
+	if (DERImg4DecodeManifest(&tmp, &m)) {
+		error("ERROR: Failed to decode image4 manifest\n");
+		rv = -19;
+		goto err;
+	}
+	
+	if (Img4ManifestGetECID(&m, ecid)) {
+		info("Failed to get ECID from image4 manifest\n");
+		rv = 2;
+		goto err;
+	}
+	
+	rv = 0;
+	
+err:
+	return rv;
+}
+
+int validate_ECID(struct idevicerestore_client_t* client)
+{
+	int rv = -1;
+	if (!client) {
+		return rv;
+	}
+	if (!client->ecid) {
+		error("ERROR: no ECID\n");
+		return rv;
+	}
+	
+	plist_t tss_data = NULL;
+	char* im4m_data = NULL;
+	uint64_t im4m_data_len = 0;
+	uint64_t im4m_ecid = 0;
+	tss_data = plist_copy(client->local_shsh);
+	if (!tss_data) {
+		error("ERROR: local TSS data not found\n");
+		rv = -2;
+		goto end;
+	}
+	
+	plist_t apimg4ticket = plist_dict_get_item(tss_data, "ApImg4Ticket");
+	if (!apimg4ticket) {
+		error("ERROR: no ApImg4Ticket dict\n");
+		rv = -3;
+		goto end;
+	}
+	
+	plist_get_data_val(apimg4ticket, &im4m_data, &im4m_data_len);
+	if (!im4m_data) {
+		error("ERROR: no img4 manifest\n");
+		rv = -4;
+		goto end;
+	}
+	
+	if (get_ECID_from_manifest(client, (const uint8_t*)im4m_data, (const size_t)im4m_data_len, &im4m_ecid)) {
+		error("ERROR: Unable to get ECID from manifest\n");
+		rv = -5;
+		goto end;
+	}
+	
+	info("Device ECID: %016" PRIx64 "\n", client->ecid);
+	info("IM4M ECID: %016" PRIx64 "\n", im4m_ecid);
+	
+	if (client->ecid != im4m_ecid) {
+		error("ERROR: ECID mismatch detected\n");
+		rv = -8;
+		goto end;
+	}
+	
+	rv = 0;
+	
+end:
+	if (tss_data) plist_free(tss_data);
+	if (im4m_data) free(im4m_data);
 	return rv;
 }
 

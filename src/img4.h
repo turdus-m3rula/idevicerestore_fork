@@ -53,6 +53,7 @@ int validate_img4_digest(
 						 uint32_t* result
 						 );
 int get_image4_manifest_hash(const uint8_t* manifest, const size_t manifest_len, uint32_t type, uint8_t** hash, size_t* hash_len);
+int validate_ECID(struct idevicerestore_client_t* client);
 
 #endif
 
