@@ -130,21 +130,24 @@ static void usage(int argc, char* argv[], int err)
 	
 #ifdef HAVE_TURDUS_MERULA
 #define TURDUS_MERULA_FLAG_LINE "\nDowngrade options:\n" \
-	"  -w, --downgrade           Downgrade with a custom firmware with shsh\n" \
-	"  -o, --tethered            Downgrade with a custom firmware without shsh\n" \
-	"  -j, --boot-pongo          Just boot pongoOS with restore chain\n" \
-	"  --load-shsh PATH          Use file at PATH as custom shsh\n" \
-	"  --load-shcblock PATH      Set SEP shellcode ciphertext block for A9 - A9X devices\n" \
-	"  --load-pteblock PATH      Set SEP pte ciphertext block for A9 - A9X devices\n" \
+	"  -w, --downgrade           Restore device to an official firmware using saved TSS record (SHSH)\n" \
+	"                            (The SHSH must match the target firmware version)\n" \
+	"  -o, --tethered            Restore to any official firmware without a matching TSS record (SHSH)\n" \
+	"                            Uses the latest signed SHSH instead\n" \
+	"                            (Requires checkm8 exploit on every reboot)\n" \
+	"  -j, --boot-pongo          Boot pongoOS with the restore chain (no restore performed)\n" \
+	"  --load-shsh PATH          Load a custom SHSH from the given PATH\n" \
+	"  --load-shcblock PATH      Load SEP ciphertext block (shcblock) for A9/A9X devices\n" \
+	"  --load-pteblock PATH      Load SEP ciphertext block (pteblock) for A9/A9X devices\n" \
 	"  --enable-serial           Enable serial output during restore\n" \
-	"  -b, --bbfw PATH           Override BasebandFirmware image path\n" \
-	"  -f, --sefw PATH           Override SE Firmware image path\n" \
-	"  -r, --rsepfw PATH         Override RestoreSEP image4 payload path\n" \
+	"  -b, --bbfw PATH           Override BasebandFirmware image\n" \
+	"  -f, --sefw PATH           Override SE Firmware image\n" \
+	"  -r, --rsepfw PATH         Override RestoreSEP image4 payload\n" \
 	"  --signed-manifest PATH    Override BuildManifest for signed firmware components\n" \
 	"  --signed-variant VARIANT  Use given VARIANT to match the build identity to use with custom signed firmware components.\n" \
-	"  --get-shcblock            Get SEP shellcode ciphertext block for A9 - A9X devices\n" \
-	"  --get-pteblock            Get SEP pte ciphertext block for A9 - A9X devices\n" \
-	"  --allow-unsupport         Allow restore to unsupport version\n\n" \
+	"  --get-shcblock            Acquire shcblock required for SEPROM exploit (fwload race) on A9/A9X devices\n" \
+	"  --get-pteblock            Acquire pteblock required for SEPROM exploit (boot_tz0 race) on A9/A9X devices\n" \
+	"  --allow-unsupport         Allow restore to an unsupported firmware version\n\n" \
 	"\nThis is a fork of idevicerestore\n"
 #else
 #define TURDUS_MERULA_FLAG_LINE ""
