@@ -61,6 +61,14 @@
 #ifdef HAVE_TURDUS_MERULA
 #include <libfragmentzip/libfragmentzip.h>
 #include "pongo.h"
+
+#include "stuff/Pongo_bin.h"
+#include "stuff/cpf_bin.h"
+#include "stuff/kpf_bin.h"
+#include "stuff/sep_racer_bin.h"
+#include "stuff/overlay_bin.h"
+#include "stuff/union_bin.h"
+
 #endif
 
 #include "locking.h"
@@ -116,9 +124,28 @@ static struct option longopts[] = {
 	{ "get-shcblock",    no_argument,       NULL, 13  },
 	{ "get-pteblock",    no_argument,       NULL, 14  },
 	{ "allow-unsupport", no_argument,       NULL, 15  },
+	{ "show-hash",       no_argument,       NULL, 16  },
 #endif
 	{ NULL, 0, NULL, 0 }
 };
+
+#ifdef HAVE_TURDUS_MERULA
+static void print_module_hash(const char* name, const uint8_t* buf, const size_t length)
+{
+	unsigned char tsha384[SHA384_DIGEST_LENGTH];
+	memset(tsha384, 0, SHA384_DIGEST_LENGTH);
+	sha384_context sha384ctx;
+	sha384_init(&sha384ctx);
+	sha384_update(&sha384ctx, buf, length);
+	sha384_final(&sha384ctx, tsha384);
+	
+	info("%s hash: ", name);
+	for (int i = 0; i < SHA384_DIGEST_LENGTH; i++) {
+		info("%02x", tsha384[i]);
+	}
+	info("\n");
+}
+#endif
 
 static void usage(int argc, char* argv[], int err)
 {
@@ -147,7 +174,8 @@ static void usage(int argc, char* argv[], int err)
 	"  --signed-variant VARIANT  Use given VARIANT to match the build identity to use with custom signed firmware components.\n" \
 	"  --get-shcblock            Acquire shcblock required for SEPROM exploit (fwload race) on A9/A9X devices\n" \
 	"  --get-pteblock            Acquire pteblock required for SEPROM exploit (boot_tz0 race) on A9/A9X devices\n" \
-	"  --allow-unsupport         Allow restore to an unsupported firmware version\n\n" \
+	"  --allow-unsupport         Allow restore to an unsupported firmware version\n" \
+	"  --show-hash               Show the SHA2-384 hashes of modules\n\n" \
 	"\nThis is a fork of idevicerestore\n"
 #else
 #define TURDUS_MERULA_FLAG_LINE ""
@@ -3614,6 +3642,15 @@ int main(int argc, char* argv[]) {
 		case 15:
 			client->flags |= FLAG_ALLOW_UNSUPPORTED;
 			break;
+
+		case 16:
+			print_module_hash("Pongo.bin", Pongo_bin, Pongo_bin_len);
+			print_module_hash("cpf", cpf_bin, cpf_bin_len);
+			print_module_hash("kpf", kpf_bin, kpf_bin_len);
+			print_module_hash("sep_racer", sep_racer_bin, sep_racer_bin_len);
+			print_module_hash("overlay.dmg", overlay_bin, overlay_bin_len);
+			print_module_hash("union.dmg", union_bin, union_bin_len);
+			return EXIT_SUCCESS;
 #endif
 
 		default:
