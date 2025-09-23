@@ -37,6 +37,10 @@
 extern "C" {
 #endif
 
+#if (__linux__)
+#define __unused __attribute__((__unused__))
+#endif
+
 /* Algorithm oids. */
 extern const DERItem
 oidRsa,         /* PKCS1 RSA encryption, used to identify RSA keys */

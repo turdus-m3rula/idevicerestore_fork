@@ -31,6 +31,9 @@
 #include <libDER/DER_Decode.h>
 #include <libDER/DER_Encode.h>
 #include <libDER/asn1Types.h>
+#if (__linux__)
+#include <arpa/inet.h>
+#endif
 #endif
 
 #include "common.h"
