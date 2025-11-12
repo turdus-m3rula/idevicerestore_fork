@@ -3060,10 +3060,15 @@ static int get_cryptex1_local_cache(struct idevicerestore_client_t* client, plis
 		if (stat(zfn, &fst) == 0) {
 			gzFile zf = gzopen(zfn, "rb");
 			if (zf) {
-				int blen = 0;
-				int readsize = 16384;
-				int bufsize = readsize;
+				size_t blen = 0;
+				size_t readsize = 16384;
+				size_t bufsize = readsize;
 				char* bin = (char*)malloc(bufsize);
+				if (bin == NULL) {
+					fprintf(stderr, "ERROR: Out of memory\n");
+					gzclose(zf);
+					return -1;
+				}
 				char* p = bin;
 				do {
 					int bytes_read = gzread(zf, p, readsize);
@@ -3071,8 +3076,9 @@ static int get_cryptex1_local_cache(struct idevicerestore_client_t* client, plis
 						fprintf(stderr, "Error reading gz compressed data\n");
 						if (bin) {
 							free(bin);
-							return -1;
 						}
+						gzclose(zf);
+						return -1;
 					}
 					blen += bytes_read;
 					if (bytes_read < readsize) {
@@ -3082,7 +3088,24 @@ static int get_cryptex1_local_cache(struct idevicerestore_client_t* client, plis
 						}
 					}
 					bufsize += readsize;
-					bin = realloc(bin, bufsize);
+					if (bufsize > 0x800000) {
+						fprintf(stderr, "ERROR: Too large file\n");
+						if (bin) {
+							free(bin);
+						}
+						gzclose(zf);
+						return -1;
+					}
+					char* realloc_bin = realloc(bin, bufsize);
+					if (realloc_bin == NULL) {
+						fprintf(stderr, "ERROR: realloc failed\n");
+						gzclose(zf);
+						if (bin) {
+							free(bin);
+						}
+						return -1;
+					}
+					bin = realloc_bin;
 					p = bin + blen;
 				} while (!gzeof(zf));
 				gzclose(zf);
