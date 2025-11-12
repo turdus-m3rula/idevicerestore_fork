@@ -2455,6 +2455,12 @@ static int restore_send_baseband_data(struct idevicerestore_client_t* client, pl
 				info("using another build manifest\n");
 			}
 			bb_identity = client->signed_identity;
+			if ((client->alternative_bbfw_identity != NULL) && client->alternative_bbfw != NULL) {
+				if (idevicerestore_debug) {
+					info("using alternative build manifest\n");
+				}
+				bb_identity = client->alternative_bbfw_identity;
+			}
 		}
 #endif
 		tss_parameters_add_from_manifest(parameters, bb_identity, true);
@@ -2533,26 +2539,50 @@ static int restore_send_baseband_data(struct idevicerestore_client_t* client, pl
 #ifdef HAVE_TURDUS_MERULA
 	}
 	else {
-		if (idevicerestore_debug) {
-			info("using another baseband firmware\n");
+		if ((client->alternative_bbfw_identity != NULL) && client->alternative_bbfw != NULL) {
+			if (idevicerestore_debug) {
+				info("using alternative baseband firmware\n");
+			}
+			bbfwtmp = get_temp_filename("bbfw_"); //client->restore->bbfw;
+			if (!bbfwtmp) {
+				size_t l = strlen(client->udid);
+				bbfwtmp = malloc(l + 10);
+				strcpy(bbfwtmp, "bbfw_");
+				strncpy(bbfwtmp + 5, client->udid, l);
+				strcpy(bbfwtmp + 5 + l, ".tmp");
+				error("WARNING: Could not generate temporary filename, using %s in current directory\n", bbfwtmp);
+			}
+			FILE *outfd = fopen(bbfwtmp, "wb");
+			if (!outfd) {
+				error("ERROR: Unable to extract baseband firmware from path\n");
+				goto leave;
+			}
+			fwrite(client->alternative_bbfw, client->alternative_bbfw_len, 1, outfd);
+			fflush(outfd);
+			fclose(outfd);
 		}
-		bbfwtmp = get_temp_filename("bbfw_"); //client->restore->bbfw;
-		if (!bbfwtmp) {
-			size_t l = strlen(client->udid);
-			bbfwtmp = malloc(l + 10);
-			strcpy(bbfwtmp, "bbfw_");
-			strncpy(bbfwtmp + 5, client->udid, l);
-			strcpy(bbfwtmp + 5 + l, ".tmp");
-			error("WARNING: Could not generate temporary filename, using %s in current directory\n", bbfwtmp);
+		else {
+			if (idevicerestore_debug) {
+				info("using another baseband firmware\n");
+			}
+			bbfwtmp = get_temp_filename("bbfw_"); //client->restore->bbfw;
+			if (!bbfwtmp) {
+				size_t l = strlen(client->udid);
+				bbfwtmp = malloc(l + 10);
+				strcpy(bbfwtmp, "bbfw_");
+				strncpy(bbfwtmp + 5, client->udid, l);
+				strcpy(bbfwtmp + 5 + l, ".tmp");
+				error("WARNING: Could not generate temporary filename, using %s in current directory\n", bbfwtmp);
+			}
+			FILE *outfd = fopen(bbfwtmp, "wb");
+			if (!outfd) {
+				error("ERROR: Unable to extract baseband firmware from path\n");
+				goto leave;
+			}
+			fwrite(client->bbfw, client->bbfw_len, 1, outfd);
+			fflush(outfd);
+			fclose(outfd);
 		}
-		FILE *outfd = fopen(bbfwtmp, "wb");
-		if (!outfd) {
-			error("ERROR: Unable to extract baseband firmware from path\n");
-			goto leave;
-		}
-		fwrite(client->bbfw, client->bbfw_len, 1, outfd);
-		fflush(outfd);
-		fclose(outfd);
 	}
 #endif
 	

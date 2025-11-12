@@ -187,6 +187,12 @@ struct idevicerestore_client_t {
 	uint8_t* alternative_ibss;
 	size_t alternative_ibss_len;
 	
+	const char* alternative_hardware_model;
+	plist_t alternative_bbfw_manifest;
+	plist_t alternative_bbfw_identity;
+	uint8_t* alternative_bbfw;
+	size_t alternative_bbfw_len;
+	
 	// tethered
 	uint8_t* t_LLB;
 	size_t t_LLB_len;

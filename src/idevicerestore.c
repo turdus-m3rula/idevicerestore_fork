@@ -125,6 +125,9 @@ static struct option longopts[] = {
 	{ "get-pteblock",    no_argument,       NULL, 14  },
 	{ "allow-unsupport", no_argument,       NULL, 15  },
 	{ "show-hash",       no_argument,       NULL, 16  },
+	{ "alternative-bbfw-manifest", required_argument, NULL, 17 },
+	{ "alternative-hardware-model", required_argument, NULL, 18  },
+	{ "alternative-bbfw", required_argument, NULL, 19  },
 #endif
 	{ NULL, 0, NULL, 0 }
 };
@@ -1771,6 +1774,24 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 			}
 		}
 		
+		if (client->alternative_bbfw_manifest) {
+			if (!client->alternative_hardware_model) {
+				error("ERROR: Alternative hardware model is not found\n");
+				if (fragment) {
+					fragmentzip_close(fragment);
+				}
+				return -1;
+			}
+			client->alternative_bbfw_identity = build_manifest_get_build_identity_for_model_with_variant(client->alternative_bbfw_manifest, client->alternative_hardware_model, RESTORE_VARIANT_ERASE_INSTALL, 0);
+			if (client->alternative_bbfw_identity == NULL) {
+				error("ERROR: Unable to find a matching alternative build identity\n");
+				if (fragment) {
+					fragmentzip_close(fragment);
+				}
+				return -1;
+			}
+		}
+		
 		/* print information about current baseband/se build identity */
 		
 		// BBFW
@@ -3167,6 +3188,12 @@ void idevicerestore_client_free(struct idevicerestore_client_t* client)
 	if (client->bbfw) {
 		free(client->bbfw);
 	}
+	if (client->alternative_bbfw_manifest) {
+		plist_free(client->alternative_bbfw_manifest);
+	}
+	if (client->alternative_bbfw) {
+		free(client->alternative_bbfw);
+	}
 	if (client->sefw) {
 		free(client->sefw);
 	}
@@ -3651,6 +3678,44 @@ int main(int argc, char* argv[]) {
 			print_module_hash("overlay.dmg", overlay_bin, overlay_bin_len);
 			print_module_hash("union.dmg", union_bin, union_bin_len);
 			return EXIT_SUCCESS;
+				
+		case 17:
+			if (!*optarg) {
+				error("ERROR: PATH argument for --alternative-bbfw-manifest must not be empty!\n");
+				usage(argc, argv, 1);
+				return EXIT_FAILURE;
+			}
+		{
+			uint8_t* _manifest_bin = NULL;
+			size_t _manifest_len = 0;
+			if (read_file_safe(optarg, (void**)&_manifest_bin, &_manifest_len, 0x800000) != 0) {
+				return EXIT_FAILURE;
+			}
+			if (memcmp(_manifest_bin, "bplist00", 8) == 0) {
+				plist_from_bin((const char *)_manifest_bin, _manifest_len, &client->alternative_bbfw_manifest);
+			}
+			else {
+				plist_from_xml((const char *)_manifest_bin, _manifest_len, &client->alternative_bbfw_manifest);
+			}
+			free(_manifest_bin);
+		}
+			break;
+			
+		case 18:
+			free((void*)client->alternative_hardware_model);
+			client->alternative_hardware_model = strdup(optarg);
+			break;
+			
+		case 19:
+			if (!*optarg) {
+				error("ERROR: PATH argument for --alternative-bbfw must not be empty!\n");
+				usage(argc, argv, 1);
+				return EXIT_FAILURE;
+			}
+			if (read_file_safe(optarg, (void**)&client->alternative_bbfw, &client->alternative_bbfw_len, 0x8000000) != 0) {
+				return EXIT_FAILURE;
+			}
+			break;
 #endif
 
 		default:
