@@ -248,6 +248,7 @@ void debug(const char* format, ...);
 void debug_plist(plist_t plist);
 void print_progress_bar(double progress);
 int read_file(const char* filename, void** data, size_t* size);
+int read_file_safe(const char* filename, void** data, size_t* size, size_t max_size);
 int write_file(const char* filename, const void* data, size_t size);
 
 char *generate_guid(void);

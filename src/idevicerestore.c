@@ -3399,7 +3399,7 @@ int main(int argc, char* argv[]) {
 				usage(argc, argv, 1);
 				return EXIT_FAILURE;
 			}
-			if (read_file(optarg, (void**)&client->bbfw, &client->bbfw_len) != 0) {
+			if (read_file_safe(optarg, (void**)&client->bbfw, &client->bbfw_len, 0x8000000) != 0) {
 				return EXIT_FAILURE;
 			}
 			client->use_specific_fwver_component = 1;
@@ -3411,7 +3411,7 @@ int main(int argc, char* argv[]) {
 				usage(argc, argv, 1);
 				return EXIT_FAILURE;
 			}
-			if (read_file(optarg, (void**)&client->sefw, &client->sefw_len) != 0) {
+			if (read_file_safe(optarg, (void**)&client->sefw, &client->sefw_len, 0x8000000) != 0) {
 				return EXIT_FAILURE;
 			}
 			client->use_specific_fwver_component = 1;
@@ -3423,7 +3423,7 @@ int main(int argc, char* argv[]) {
 				usage(argc, argv, 1);
 				return EXIT_FAILURE;
 			}
-			if (read_file(optarg, (void**)&client->rsepfw, &client->rsepfw_len) != 0) {
+			if (read_file_safe(optarg, (void**)&client->rsepfw, &client->rsepfw_len, 0x8000000) != 0) {
 				return EXIT_FAILURE;
 			}
 			client->use_specific_fwver_component = 1;
@@ -3538,7 +3538,7 @@ int main(int argc, char* argv[]) {
 		case 'T': {
 			size_t root_ticket_len = 0;
 			unsigned char* root_ticket = NULL;
-			if (read_file(optarg, (void**)&root_ticket, &root_ticket_len) != 0) {
+			if (read_file_safe(optarg, (void**)&root_ticket, &root_ticket_len, 0x800000) != 0) {
 				return EXIT_FAILURE;
 			}
 			client->root_ticket = root_ticket;
@@ -3583,7 +3583,7 @@ int main(int argc, char* argv[]) {
 				free(client->sep_shellcode_block);
 				client->sep_shellcode_block = NULL;
 			}
-			if (read_file(optarg, (void**)&client->sep_shellcode_block, &client->sep_shellcode_block_len) != 0) {
+			if (read_file_safe(optarg, (void**)&client->sep_shellcode_block, &client->sep_shellcode_block_len, 0x400) != 0) {
 				return EXIT_FAILURE;
 			}
 			info("Using SEP shellcode ciphertext block, found at %s length %zu\n", optarg, client->sep_shellcode_block_len);
@@ -3598,7 +3598,7 @@ int main(int argc, char* argv[]) {
 			}
 			uint8_t* _manifest_bin = NULL;
 			size_t _manifest_len = 0;
-			if (read_file(optarg, (void**)&_manifest_bin, &_manifest_len) != 0) {
+			if (read_file_safe(optarg, (void**)&_manifest_bin, &_manifest_len, 0x800000) != 0) {
 				return EXIT_FAILURE;
 			}
 			if (memcmp(_manifest_bin, "bplist00", 8) == 0) {
@@ -3616,7 +3616,7 @@ int main(int argc, char* argv[]) {
 				free(client->sep_shellcode_block);
 				client->sep_shellcode_block = NULL;
 			}
-			if (read_file(optarg, (void**)&client->sep_shellcode_block, &client->sep_shellcode_block_len) != 0) {
+			if (read_file_safe(optarg, (void**)&client->sep_shellcode_block, &client->sep_shellcode_block_len, 0x400) != 0) {
 				return EXIT_FAILURE;
 			}
 			info("Using SEP pte ciphertext block, found at %s length %zu\n", optarg, client->sep_shellcode_block_len);

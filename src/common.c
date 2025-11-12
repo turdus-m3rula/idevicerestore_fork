@@ -244,6 +244,60 @@ int read_file(const char* filename, void** data, size_t* size) {
 	return 0;
 }
 
+int read_file_safe(const char* filename, void** data, size_t* size, size_t max_size) {
+	size_t bytes = 0;
+	size_t length = 0;
+	FILE* file = NULL;
+	char* buffer = NULL;
+	struct stat fst;
+	
+	debug("Reading data from %s\n", filename);
+	
+	*size = 0;
+	*data = NULL;
+	
+	file = fopen(filename, "rb");
+	if (file == NULL) {
+		error("read_file: cannot open %s: %s\n", filename, strerror(errno));
+		return -1;
+	}
+	
+	if (fstat(fileno(file), &fst) < 0) {
+		error("read_file: fstat: %s\n", strerror(errno));
+		fclose(file);
+		return -1;
+	}
+	if (fst.st_size < 0) {
+		error("ERROR: Invalid file size\n");
+		fclose(file);
+		return -1;
+	}
+	length = (size_t)fst.st_size;
+	if (length == 0 || length > max_size) {
+		error("ERROR: File is empty or exceeds limit\n");
+		fclose(file);
+		return -1;
+	}
+	buffer = (char*) malloc(length);
+	if (buffer == NULL) {
+		error("ERROR: Out of memory\n");
+		fclose(file);
+		return -1;
+	}
+	bytes = fread(buffer, 1, length, file);
+	fclose(file);
+	
+	if (bytes != length) {
+		error("ERROR: Unable to read entire file\n");
+		free(buffer);
+		return -1;
+	}
+	
+	*size = length;
+	*data = buffer;
+	return 0;
+}
+
 void debug_plist(plist_t plist) {
 	uint32_t size = 0;
 	char* data = NULL;
