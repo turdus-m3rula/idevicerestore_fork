@@ -2214,23 +2214,47 @@ debug("%s length: %zu\n", #name, client->t_##name##_len); \
 	if (client->flags & FLAG_TETHERED) {
 		int is_supported_version = 0;
 		if (
-			client->build_major == 10 ||
-			client->build_major == 11 ||
-			client->build_major == 12 ||
-			client->build_major == 13 ||
-			client->build_major == 14 ||
-			client->build_major == 15 ||
-			client->build_major == 16 ||
-			client->build_major == 17 ||
-			client->build_major == 18 ||
-			client->build_major == 19 ||
-			client->build_major == 20 ||
-			client->build_major == 21
+			client->build_major == 10 || // iOS 6
+			client->build_major == 13 || // iOS 9
+			client->build_major == 14 || // iOS 10
+			client->build_major == 15 || // iOS 11
+			client->build_major == 17 || // iOS/iPadOS 13
+			client->build_major == 18 || // iOS/iPadOS 14
+			client->build_major == 19 || // iOS/iPadOS 15
+			client->build_major == 20 || // iPadOS 16
+			client->build_major == 21    // iPadOS 17
 			)
 		{
 				is_supported_version = 1;
 		}
 		
+		// iOS 7
+		if (client->build_major == 11) {
+			if (client->cpid != 0x8960 && client->cpid != 0x7000 && client->cpid != 0x7001) {
+				is_supported_version = 1;
+			}
+		}
+		
+		// iOS 8
+		if (client->build_major == 12) {
+			if (client->cpid != 0x7000 && client->cpid != 0x7001) {
+				is_supported_version = 1;
+			}
+		}
+		
+		// iOS 12
+		if (client->build_major == 16) {
+			if (strncmp(client->version, "12.0", 4) == 0 ||
+				strncmp(client->version, "12.1", 4) == 0 ||
+				strncmp(client->version, "12.2", 4) == 0 ||
+				strncmp(client->version, "12.3", 4) == 0 ||
+				strncmp(client->version, "12.4", 4) == 0)
+			{
+				is_supported_version = 1;
+			}
+		}
+		
+		// iPadOS 18
 		if (client->build_major == 22) {
 			if (strncmp(client->version, "18.0", 4) == 0 ||
 				strncmp(client->version, "18.1", 4) == 0 ||
