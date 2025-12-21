@@ -128,6 +128,7 @@ static struct option longopts[] = {
 	{ "alternative-bbfw-manifest", required_argument, NULL, 17 },
 	{ "alternative-hardware-model", required_argument, NULL, 18  },
 	{ "alternative-bbfw", required_argument, NULL, 19  },
+	{ "api-url",         required_argument, NULL, 20  },
 #endif
 	{ NULL, 0, NULL, 0 }
 };
@@ -3766,6 +3767,35 @@ int main(int argc, char* argv[]) {
 				return EXIT_FAILURE;
 			}
 			break;
+
+		case 20:
+			if (gAPIURL) {
+				error("ERROR: API URL has already been set!\n");
+				usage(argc, argv, 1);
+				return EXIT_FAILURE;
+			}
+			if (!*optarg) {
+				error("ERROR: URL argument for --api-url must not be empty!\n");
+				usage(argc, argv, 1);
+				return EXIT_FAILURE;
+			}
+			char *baseurl = NULL;
+			if (!strncmp(optarg, "http://", 7) && (strlen(optarg) > 7) && (optarg[7] != '/')) {
+				baseurl = optarg + 7;
+			}
+			else if (!strncmp(optarg, "https://", 8) && (strlen(optarg) > 8) && (optarg[8] != '/')) {
+				baseurl = optarg + 8;
+			}
+			if (baseurl) {
+				gAPIURL = strdup(optarg);
+			}
+			else {
+				error("ERROR: URL argument for --api-url is invalid, must start with http:// or https://\n");
+				usage(argc, argv, 1);
+				return EXIT_FAILURE;
+			}
+			break;
+
 #endif
 
 		default:

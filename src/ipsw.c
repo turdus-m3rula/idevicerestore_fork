@@ -1056,6 +1056,7 @@ int ipsw_list_contents(ipsw_archive_t ipsw, ipsw_list_cb cb, void *ctx)
 	return ret;
 }
 
+const char *gAPIURL = NULL;
 int ipsw_get_signed_firmwares(const char* product, plist_t* firmwares)
 {
 	char url[256];
@@ -1073,8 +1074,28 @@ int ipsw_get_signed_firmwares(const char* product, plist_t* firmwares)
 	}
 
 	*firmwares = NULL;
-	snprintf(url, sizeof(url), "https://api.ipsw.me/v4/device/%s", product);
 
+	// snprintf(url, sizeof(url), "https://api.ipsw.me/v4/device/%s", product);
+	int set_api_url = 0;
+	if (gAPIURL != NULL) {
+		size_t len = strlen(gAPIURL);
+		size_t prod_len = strlen(product);
+		size_t limit = sizeof(url);
+		if (len > 0 && prod_len > 0) {
+			if (len < limit && prod_len < limit) {
+				if (prod_len < (limit - len - 2)) {
+					const char* fmt = (gAPIURL[len - 1] == '/') ? "%s%s" : "%s/%s";
+					snprintf(url, sizeof(url), fmt, gAPIURL, product);
+					set_api_url = 1;
+				}
+			}
+		}
+	}
+	
+	if (!set_api_url) {
+		snprintf(url, sizeof(url), "https://api.ipsw.me/v4/device/%s", product);
+	}
+	
 	if (download_to_buffer(url, &jdata, &jsize) < 0) {
 		error("ERROR: Download from %s failed.\n", url);
 		return -1;
