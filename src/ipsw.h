@@ -83,7 +83,7 @@ int ipsw_download_latest_fw(plist_t version_data, const char* product, const cha
 
 void ipsw_cancel(void);
 
-const char *gAPIURL;
+extern const char *gAPIURL;
 
 #ifdef __cplusplus
 }
