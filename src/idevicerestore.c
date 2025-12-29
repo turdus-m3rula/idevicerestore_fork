@@ -179,7 +179,7 @@ static void usage(int argc, char* argv[], int err)
 	"  --get-shcblock            Acquire shcblock required for SEPROM exploit (fwload race) on A9/A9X devices\n" \
 	"  --get-pteblock            Acquire pteblock required for SEPROM exploit (boot_tz0 race) on A9/A9X devices\n" \
 	"  --allow-unsupport         Allow restore to an unsupported firmware version\n" \
-	"  --api-url URL             Override default API server URL"
+	"  --api-url URL             Override default API server URL\n" \
 	"  --show-hash               Show the SHA2-384 hashes of embedded modules\n\n" \
 	"\nThis is a fork of idevicerestore\n"
 #else
