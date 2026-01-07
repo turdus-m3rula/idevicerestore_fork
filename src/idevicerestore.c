@@ -2264,7 +2264,8 @@ debug("%s length: %zu\n", #name, client->t_##name##_len); \
 				strncmp(client->version, "18.3", 4) == 0 ||
 				strncmp(client->version, "18.4", 4) == 0 ||
 				strncmp(client->version, "18.5", 4) == 0 ||
-				strncmp(client->version, "18.6", 4) == 0)
+				strncmp(client->version, "18.6", 4) == 0 ||
+				strncmp(client->version, "18.7", 4) == 0)
 			{
 				is_supported_version = 1;
 			}
