@@ -2195,16 +2195,25 @@ return -1; \
 debug("%s length: %zu\n", #name, client->t_##name##_len); \
 }
 				
+				/*
+				 client->device->product_type
+				 */
+				
 				DL_FW_COMP(LLB);
-				DL_FW_COMP(AppleLogo);
-				DL_FW_COMP(BatteryCharging0);
-				DL_FW_COMP(BatteryCharging1);
-				DL_FW_COMP(BatteryFull);
-				DL_FW_COMP(BatteryLow0);
-				DL_FW_COMP(BatteryLow1);
-				DL_FW_COMP(BatteryPlugin);
-				DL_FW_COMP(RecoveryMode);
 				DL_FW_COMP(iBoot);
+				DL_FW_COMP(AppleLogo);
+				DL_FW_COMP(RecoveryMode);
+				if (client->device->product_type && strncmp(client->device->product_type, "AppleTV", 7) == 0) {
+					// YOLO
+				}
+				else {
+					DL_FW_COMP(BatteryCharging0);
+					DL_FW_COMP(BatteryCharging1);
+					DL_FW_COMP(BatteryFull);
+					DL_FW_COMP(BatteryLow0);
+					DL_FW_COMP(BatteryLow1);
+					DL_FW_COMP(BatteryPlugin);
+				}
 			}
 		}
 		

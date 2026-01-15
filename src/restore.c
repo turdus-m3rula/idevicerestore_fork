@@ -1757,15 +1757,22 @@ memcpy(component_data, client->t_##name, component_size); \
 } \
 } \
 }
+            OVERRIDE_FW_COMP(iBoot);
 			OVERRIDE_FW_COMP(AppleLogo);
-			OVERRIDE_FW_COMP(BatteryCharging0);
-			OVERRIDE_FW_COMP(BatteryCharging1);
-			OVERRIDE_FW_COMP(BatteryFull);
-			OVERRIDE_FW_COMP(BatteryLow0);
-			OVERRIDE_FW_COMP(BatteryLow1);
-			OVERRIDE_FW_COMP(BatteryPlugin);
-			OVERRIDE_FW_COMP(RecoveryMode);
-			OVERRIDE_FW_COMP(iBoot);
+            OVERRIDE_FW_COMP(RecoveryMode);
+            if (client->device->product_type && strncmp(client->device->product_type, "AppleTV", 7) == 0) {
+                // YOLO
+            }
+            else {
+                OVERRIDE_FW_COMP(BatteryCharging0);
+                OVERRIDE_FW_COMP(BatteryCharging1);
+                OVERRIDE_FW_COMP(BatteryFull);
+                OVERRIDE_FW_COMP(BatteryLow0);
+                OVERRIDE_FW_COMP(BatteryLow1);
+                OVERRIDE_FW_COMP(BatteryPlugin);
+            }
+            
+            
 		}
 #endif
 
