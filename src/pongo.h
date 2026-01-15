@@ -67,6 +67,7 @@ extern int pongo_shell(struct idevicerestore_client_t* idr_client,
 					   struct irecv_device *device,
 					   irecv_client_t *pclient,
 					   int g_just_boot_pongo,
-					   int is_tethered);
+					   int is_tethered,
+					   unsigned int boot_delay);
 
 #endif

@@ -225,7 +225,8 @@ int pongo_shell(struct idevicerestore_client_t* idr_client,
 				struct irecv_device *device,
 				irecv_client_t *pclient,
 				int g_just_boot_pongo,
-				int is_tethered)
+				int is_tethered,
+				unsigned int boot_delay)
 {
 	irecv_client_t client = *pclient;
 	
@@ -650,6 +651,9 @@ info("sent %s msg\n", name); \
 		}
 		
 		if (CURRENT_STAGE == SEND_BOOTUX) {
+			if (boot_delay != 0) {
+				sleep(boot_delay);
+			}
 			rv = irecv_usb_control_transfer_no_timeout_retval(client, 0x21, 3, 0, 0, (unsigned char *)"bootux\n", (uint32_t)(strlen("bootux\n")), &r32);
 			info("sent bootux\n");
 			return 0;

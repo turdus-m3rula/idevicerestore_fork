@@ -3085,17 +3085,22 @@ debug("%s length: %zu\n", #name, client->t_##name##_len); \
 				
 				int is_pongo_only = 0;
 				int is_tethered = 0;
+				unsigned int boot_delay = 0;
 				if (client->flags & FLAG_BOOT_PONGO) {
 					is_pongo_only = 1;
 				}
 				if (client->flags & FLAG_TETHERED) {
 					is_tethered = 1;
 				}
+				if (client->device->product_type && strncmp(client->device->product_type, "AppleTV", 7) == 0) {
+					boot_delay = 10;
+				}
 				if (pongo_shell(client,
 								client->device,
 								&client->dfu->client,
 								is_pongo_only,
-								is_tethered)) {
+								is_tethered,
+								boot_delay)) {
 					mutex_unlock(&client->device_event_mutex);
 					if (!(client->flags & FLAG_QUIT)) {
 						error("ERROR: Failed to execute pongo shell\n");
