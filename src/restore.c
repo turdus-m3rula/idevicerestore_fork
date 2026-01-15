@@ -2027,6 +2027,37 @@ memcpy(component_data, client->t_##name, component_size); \
 	return 0;
 }
 
+// idk but it works
+int restore_send_host_system_time(struct idevicerestore_client_t* client, plist_t message)
+{
+	time_t now = time(NULL);
+	debug("Host system time in second since Epoch is %ld.\n", (long)now);
+	
+	plist_t dict = plist_new_dict();
+	
+	plist_dict_set_item(dict, "SetHostTimeOnDevice", plist_new_uint((uint64_t)now));
+	
+	restore_service_client_t service = _restore_get_service_client_for_data_request(client, message);
+	if (!service) {
+		error("ERROR: %s: Unable to connect to service client\n", __func__);
+		plist_free(dict);
+		return -1;
+	}
+	
+	info("Sending HostSystemTime now...\n");
+	restored_error_t restore_error = _restore_service_send(service, dict, PLIST_FORMAT_BINARY);
+	_restore_service_free(service);
+	plist_free(dict);
+	
+	if (restore_error != RESTORE_E_SUCCESS) {
+		error("ERROR: Unable to send HostSystemTime\n");
+		return -1;
+	}
+	
+	info("Done sending HostSystemTime\n");
+	return 0;
+}
+
 static const char* restore_get_bbfw_fn_for_element(const char* elem)
 {
 	struct bbfw_fn_elem_t {
