@@ -2279,6 +2279,16 @@ debug("%s length: %zu\n", #name, client->t_##name##_len); \
 				is_supported_version = 1;
 			}
 		}
+        
+        // tvOS 26
+        if (client->build_major == 23) {
+            if (strncmp(client->version, "26.0", 4) == 0 ||
+                strncmp(client->version, "26.1", 4) == 0 ||
+                strncmp(client->version, "26.2", 4) == 0)
+            {
+                is_supported_version = 1;
+            }
+        }
 		
 		if (!is_supported_version) {
 			if (!(client->flags & FLAG_ALLOW_UNSUPPORTED)) {

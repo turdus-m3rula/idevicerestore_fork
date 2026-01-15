@@ -445,7 +445,8 @@ info("sent %s msg\n", name); \
 				 idr_client->build_major == 19 ||
 				 idr_client->build_major == 20 ||
 				 idr_client->build_major == 21 ||
-				 idr_client->build_major == 22
+				 idr_client->build_major == 22 ||
+				 idr_client->build_major == 23
 				 ) && is_tethered) {
 				CURRENT_STAGE = SEND_KPF_TETHERED;
 			}
@@ -554,7 +555,8 @@ info("sent %s msg\n", name); \
 				 idr_client->build_major == 19 ||
 				 idr_client->build_major == 20 ||
 				 idr_client->build_major == 21 ||
-				 idr_client->build_major == 22
+				 idr_client->build_major == 22 ||
+				 idr_client->build_major == 23
 				 ) && is_tethered) {
 				CURRENT_STAGE = SEND_KPF_TETHERED;
 			}
