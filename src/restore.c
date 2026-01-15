@@ -5491,6 +5491,13 @@ debug("%s: type = %s\n", __func__, type);
 				return -1;
 			}
 		}
+		
+		else if (!strcmp(type, "HostSystemTime")) {
+			if (restore_send_host_system_time(client, message) < 0) {
+				error("ERROR: Unable to send HostSystemTime data\n");
+				return -1;
+			}
+		}
 
 		else {
 			// Unknown DataType!!
