@@ -39,6 +39,10 @@ extern "C" {
 #include <libirecovery.h>
 #include <libimobiledevice-glue/thread.h>
 
+#ifdef HAVE_TURDUS_MERULA
+#include <stdalign.h>
+#endif
+
 #include "idevicerestore.h"
 
 #define _MODE_UNKNOWN         0
@@ -246,6 +250,16 @@ typedef struct {
 #define BSEP_TYPE_SHC  (1uLL << 0)
 #define BSEP_TYPE_PTE  (1uLL << 1)
 
+typedef struct {
+	alignas(8) uint32_t magic;
+	uint32_t pad0;
+	uint64_t type;
+	uint64_t fullsize;
+	uint64_t datasize;
+	uint64_t offset;
+	uint64_t tag;
+	uint64_t pad1;
+} rdsk_bin_t;
 #define PLATFORM_FLAG_CPID_8960 (1uLL << 0)
 #define PLATFORM_FLAG_CPID_8965 (1uLL << 1)
 #define PLATFORM_FLAG_CPID_7000 (1uLL << 2)

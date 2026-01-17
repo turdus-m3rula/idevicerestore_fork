@@ -74,6 +74,15 @@ ptr = NULL; \
 } \
 }
 
+static inline uint32_t read_u32_le(const uint8_t *p)
+{
+	return (
+			((uint32_t)p[0]      ) |
+			((uint32_t)p[1] <<  8) |
+			((uint32_t)p[2] << 16) |
+			((uint32_t)p[3] << 24)
+			);
+}
 static inline uint64_t read_u64_le(const unsigned char *p)
 {
 	return (uint64_t)p[0] |
@@ -218,6 +227,80 @@ int send_pongo_image(struct idevicerestore_client_t* client)
 	
 	FREE(pongoRawImage);
 	FREE(PongoImage);
+	return 0;
+}
+
+#define MAX_FILE_SIZE (20 * 1024 * 1024)
+static int load_rdsk(const uint8_t* bin, size_t bin_len, uint64_t flag, const char* name, uint8_t** rdsk_buf, size_t* rdsk_size)
+{
+	if (rdsk_buf) {
+		*rdsk_buf = NULL;
+	}
+	if (rdsk_size) {
+		*rdsk_size = 0;
+	}
+	uint8_t* tmpbuf = NULL;
+	uint64_t datasize = 0;
+	
+	uint8_t* buf = NULL;
+	if (bin_len < sizeof(rdsk_bin_t)) {
+		error("ERROR: %s module too small\n", name);
+		return -1;
+	}
+	int res = posix_memalign((void**)&buf, 8, bin_len);
+	if (res != 0) {
+		error("ERROR: Alloc failed: %s\n", name);
+		return -2;
+	}
+	memset(buf, 0, bin_len);
+	memcpy(buf, bin, bin_len);
+	int success = 0;
+	if (
+		(read_u32_le((uint8_t*)buf + offsetof(rdsk_bin_t, magic)) == 0xca1337feu) &&
+		(read_u64_le((uint8_t*)buf + offsetof(rdsk_bin_t, type)) == (0x0000cafebabe9990uLL | (flag << 48)))
+		)
+	{
+		uint64_t offset = 0;
+		datasize = read_u64_le((uint8_t*)buf + offsetof(rdsk_bin_t, datasize));
+		offset = read_u64_le((uint8_t*)buf + offsetof(rdsk_bin_t, offset));
+		if (datasize > MAX_FILE_SIZE) {
+			error("ERROR: File is too large (%u > %u)\n", (unsigned int)datasize, (unsigned int)MAX_FILE_SIZE);
+			free(buf);
+			return -2;
+		}
+		if (offset != sizeof(rdsk_bin_t)) {
+			error("ERROR: Wrong data structure size (%llu != %lu)\n", offset, sizeof(rdsk_bin_t));
+			free(buf);
+			return -2;
+		}
+		if ((datasize + offset) != bin_len) {
+			error("ERROR: File is wrong size (%lu != %u)\n", (unsigned long)(datasize + offset), (unsigned int)bin_len);
+			free(buf);
+			return -2;
+		}
+		if (rdsk_buf && rdsk_size) {
+			tmpbuf = malloc(datasize);
+			if (!tmpbuf) {
+				error("ERROR: Alloc failed\n");
+				free(buf);
+				return -2;
+			}
+			memcpy(tmpbuf, buf + offset, datasize);
+		}
+		success = 1;
+	}
+	free(buf);
+	if (!success) {
+		error("ERROR: Invalid %s module\n", name);
+		if (tmpbuf) {
+			free(tmpbuf);
+		}
+		return -3;
+	}
+	if (tmpbuf) {
+		*rdsk_buf = tmpbuf;
+		*rdsk_size = datasize;
+	}
 	return 0;
 }
 
@@ -570,22 +653,50 @@ info("sent %s msg\n", name); \
 		}
 		
 		if (CURRENT_STAGE == SEND_OVERLAY) {
+			uint8_t* rdsk_buf = NULL;
+			size_t rdsk_size = 0;
+			uint64_t flag = 0;
+			char* path = NULL;
+			uint8_t* cur_bin_buf = NULL;
+			size_t cur_bin_size = 0;
 			if (idr_client->build_major == 14 || idr_client->build_major == 15) {
-                if (boot_delay == 0) {
-                    PONGO_SEND_BUFFER(union_iphoneos_bin, union_iphoneos_bin_len, "uploadOverlay[iPhoneOS]");
-                }
-                else {
-                    PONGO_SEND_BUFFER(union_tvos_bin, union_tvos_bin_len, "uploadOverlay[tvOS]");
-                }
+				if (boot_delay == 0) {
+					flag = 0x2222;
+					path = "union.dmg[iPhoneOS]";
+					cur_bin_buf = (uint8_t*)union_iphoneos_bin;
+					cur_bin_size = (size_t)union_iphoneos_bin_len;
+				}
+				else {
+					flag = 0x2222;
+					path = "union.dmg[tvOS]";
+					cur_bin_buf = (uint8_t*)union_tvos_bin;
+					cur_bin_size = (size_t)union_tvos_bin_len;
+				}
 			}
 			else {
-                if (boot_delay == 0) {
-                    PONGO_SEND_BUFFER(overlay_iphoneos_bin, overlay_iphoneos_bin_len, "uploadOverlay[iPhoneOS]");
-                }
-                else {
-                    PONGO_SEND_BUFFER(overlay_tvos_bin, overlay_tvos_bin_len, "uploadOverlay[tvOS]");
-                }
+				if (boot_delay == 0) {
+					flag = 0x1111;
+					path = "overlay.dmg[iPhoneOS]";
+					cur_bin_buf = (uint8_t*)overlay_iphoneos_bin;
+					cur_bin_size = (size_t)overlay_iphoneos_bin_len;
+				}
+				else {
+					flag = 0x1111;
+					path = "overlay.dmg[tvOS]";
+					cur_bin_buf = (uint8_t*)overlay_tvos_bin;
+					cur_bin_size = (size_t)overlay_tvos_bin_len;
+				}
 			}
+			if (cur_bin_buf == NULL) {
+				error("ERROR: No ramdisk buffer\n");
+				return -1;
+			}
+			if (load_rdsk(cur_bin_buf, cur_bin_size, flag, path, &rdsk_buf, &rdsk_size)) {
+				error("ERROR: Unable to extract ramdisk\n");
+				return -1;
+			}
+			PONGO_SEND_BUFFER(rdsk_buf, rdsk_size, path);
+			free(rdsk_buf);
 			CURRENT_STAGE = LOAD_OVERLAY;
 			continue;
 		}

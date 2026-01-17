@@ -59,7 +59,6 @@
 #endif
 
 #ifdef HAVE_TURDUS_MERULA
-#include <stdalign.h>
 #include <libfragmentzip/libfragmentzip.h>
 #include "pongo.h"
 
@@ -526,17 +525,7 @@ static uint64_t convert_cpid_bdid_to_plat_vflag(uint16_t cpid, uint8_t bdid)
 	}
 	return 0;
 }
-typedef struct {
-	alignas(8) uint32_t magic;
-	uint32_t pad0;
-	uint64_t type;
-	uint64_t fullsize;
-	uint64_t datasize;
-	uint64_t offset;
-	uint64_t tag;
-	uint64_t pad1;
-} rdsk_bin_t;
-static int load_rdsk_flag(const uint8_t* bin, size_t bin_len, const char* name, uint64_t* out_flag)
+static int load_rdsk_flag(const uint8_t* bin, size_t bin_len, uint64_t flag, const char* name, uint64_t* out_flag)
 {
 	uint8_t* buf = NULL;
 	if (bin_len < sizeof(rdsk_bin_t)) {
@@ -553,7 +542,7 @@ static int load_rdsk_flag(const uint8_t* bin, size_t bin_len, const char* name, 
 	int success = 0;
 	if (
 		(read_u32_le((uint8_t*)buf + offsetof(rdsk_bin_t, magic)) == 0xca1337feu) &&
-		(read_u64_le((uint8_t*)buf + offsetof(rdsk_bin_t, type)) == 0x1111cafebabe9990uLL)
+		(read_u64_le((uint8_t*)buf + offsetof(rdsk_bin_t, type)) == (0x0000cafebabe9990uLL | (flag << 48)))
 		)
 	{
 		if (out_flag) {
@@ -1076,16 +1065,16 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 			uint64_t union_iphoneos_flag = 0;
 			uint64_t union_tvos_flag = 0;
 			
-			if (load_rdsk_flag((const uint8_t*)overlay_iphoneos_bin, overlay_iphoneos_bin_len, "overlay.dmg[iPhoneOS]", &overlay_iphoneos_flag)) {
+			if (load_rdsk_flag((const uint8_t*)overlay_iphoneos_bin, overlay_iphoneos_bin_len, 0x1111, "overlay.dmg[iPhoneOS]", &overlay_iphoneos_flag)) {
 				return -2;
 			}
-			if (load_rdsk_flag((const uint8_t*)overlay_tvos_bin, overlay_tvos_bin_len, "overlay.dmg[tvOS]", &overlay_tvos_flag)) {
+			if (load_rdsk_flag((const uint8_t*)overlay_tvos_bin, overlay_tvos_bin_len, 0x1111, "overlay.dmg[tvOS]", &overlay_tvos_flag)) {
 				return -2;
 			}
-			if (load_rdsk_flag((const uint8_t*)union_iphoneos_bin, union_iphoneos_bin_len, "union.dmg[iPhoneOS]", &union_iphoneos_flag)) {
+			if (load_rdsk_flag((const uint8_t*)union_iphoneos_bin, union_iphoneos_bin_len, 0x2222, "union.dmg[iPhoneOS]", &union_iphoneos_flag)) {
 				return -2;
 			}
-			if (load_rdsk_flag((const uint8_t*)union_tvos_bin, union_tvos_bin_len, "union.dmg[tvOS]", &union_tvos_flag)) {
+			if (load_rdsk_flag((const uint8_t*)union_tvos_bin, union_tvos_bin_len, 0x2222, "union.dmg[tvOS]", &union_tvos_flag)) {
 				return -2;
 			}
 			if (load_module_flag((const uint8_t*)cpf_bin, cpf_bin_len, 0xAAAA000000009990uLL, "cpf", &cpf_flag)) {
