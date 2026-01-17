@@ -437,18 +437,7 @@ info("sent %s msg\n", name); \
 			pwn_seprom_state = 2;
 			PONGO_SEND_MSG("sep pwn_pte\n", "pwn pte");
 			
-			if ((
-				 idr_client->build_major == 14 ||
-				 idr_client->build_major == 15 ||
-				 idr_client->build_major == 16 ||
-				 idr_client->build_major == 17 ||
-				 idr_client->build_major == 18 ||
-				 idr_client->build_major == 19 ||
-				 idr_client->build_major == 20 ||
-				 idr_client->build_major == 21 ||
-				 idr_client->build_major == 22 ||
-				 idr_client->build_major == 23
-				 ) && is_tethered) {
+			if (idr_client->build_major >= 14 && is_tethered) {
 				CURRENT_STAGE = SEND_KPF_TETHERED;
 			}
 			else if (idr_client->build_major == 14 && idr_client->need_asr_patch) {
@@ -547,18 +536,7 @@ info("sent %s msg\n", name); \
 				continue;
 			}
 			
-			if ((
-				 idr_client->build_major == 14 ||
-				 idr_client->build_major == 15 ||
-				 idr_client->build_major == 16 ||
-				 idr_client->build_major == 17 ||
-				 idr_client->build_major == 18 ||
-				 idr_client->build_major == 19 ||
-				 idr_client->build_major == 20 ||
-				 idr_client->build_major == 21 ||
-				 idr_client->build_major == 22 ||
-				 idr_client->build_major == 23
-				 ) && is_tethered) {
+			if (idr_client->build_major >= 14 && is_tethered) {
 				CURRENT_STAGE = SEND_KPF_TETHERED;
 			}
 			else if (idr_client->build_major == 14 && idr_client->need_asr_patch) {
@@ -593,10 +571,20 @@ info("sent %s msg\n", name); \
 		
 		if (CURRENT_STAGE == SEND_OVERLAY) {
 			if (idr_client->build_major == 14 || idr_client->build_major == 15) {
-				PONGO_SEND_BUFFER(union_bin, union_bin_len, "uploadOverlay");
+                if (boot_delay == 0) {
+                    PONGO_SEND_BUFFER(union_iphoneos_bin, union_iphoneos_bin_len, "uploadOverlay[iPhoneOS]");
+                }
+                else {
+                    PONGO_SEND_BUFFER(union_tvos_bin, union_tvos_bin_len, "uploadOverlay[tvOS]");
+                }
 			}
 			else {
-				PONGO_SEND_BUFFER(overlay_bin, overlay_bin_len, "uploadOverlay");
+                if (boot_delay == 0) {
+                    PONGO_SEND_BUFFER(overlay_iphoneos_bin, overlay_iphoneos_bin_len, "uploadOverlay[iPhoneOS]");
+                }
+                else {
+                    PONGO_SEND_BUFFER(overlay_tvos_bin, overlay_tvos_bin_len, "uploadOverlay[tvOS]");
+                }
 			}
 			CURRENT_STAGE = LOAD_OVERLAY;
 			continue;

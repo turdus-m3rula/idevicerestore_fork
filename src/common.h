@@ -142,6 +142,14 @@ struct idevicerestore_client_t {
 	int async_err;
     
 #ifdef HAVE_TURDUS_MERULA
+    uint64_t kpf_flag ;
+    uint64_t cpf_flag;
+    uint64_t sep_racer_flag;
+    uint64_t overlay_iphoneos_flag;
+    uint64_t overlay_tvos_flag;
+    uint64_t union_iphoneos_flag;
+    uint64_t union_tvos_flag;
+    
 	int disable_serial_output;
 	int is_32bit_soc;
 	uint16_t cpid;
@@ -237,6 +245,35 @@ typedef struct {
 #define BSEP_TYPE_NONE (0)
 #define BSEP_TYPE_SHC  (1uLL << 0)
 #define BSEP_TYPE_PTE  (1uLL << 1)
+
+#define PLATFORM_FLAG_CPID_8960 (1uLL << 0)
+#define PLATFORM_FLAG_CPID_8965 (1uLL << 1)
+#define PLATFORM_FLAG_CPID_7000 (1uLL << 2)
+#define PLATFORM_FLAG_CPID_7001 (1uLL << 3)
+#define PLATFORM_FLAG_CPID_8000 (1uLL << 4)
+#define PLATFORM_FLAG_CPID_8003 (1uLL << 5)
+#define PLATFORM_FLAG_CPID_8001 (1uLL << 6)
+#define PLATFORM_FLAG_CPID_8010 (1uLL << 7)
+#define PLATFORM_FLAG_CPID_8011 (1uLL << 8)
+#define PLATFORM_FLAG_CPID_8012 (1uLL << 9)
+#define PLATFORM_FLAG_CPID_8015 (1uLL << 10)
+
+#define PLATFORM_FLAG_ENV_IOS   (1uLL << 16)
+#define PLATFORM_FLAG_ENV_TVOS  (1uLL << 17)
+
+#define IOS_VERSION_FLAG_7      (1uLL << 32)
+#define IOS_VERSION_FLAG_8      (1uLL << 33)
+#define IOS_VERSION_FLAG_9      (1uLL << 34)
+#define IOS_VERSION_FLAG_10     (1uLL << 35)
+#define IOS_VERSION_FLAG_11     (1uLL << 36)
+#define IOS_VERSION_FLAG_12     (1uLL << 37)
+#define IOS_VERSION_FLAG_13     (1uLL << 38)
+#define IOS_VERSION_FLAG_14     (1uLL << 39)
+#define IOS_VERSION_FLAG_15     (1uLL << 40)
+#define IOS_VERSION_FLAG_16     (1uLL << 41)
+#define IOS_VERSION_FLAG_17     (1uLL << 42)
+#define IOS_VERSION_FLAG_18     (1uLL << 43)
+#define IOS_VERSION_FLAG_26     (1uLL << 44)
 
 #endif
 

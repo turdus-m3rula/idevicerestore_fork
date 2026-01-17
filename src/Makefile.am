@@ -65,10 +65,10 @@ idevicerestore_SOURCES += \
 	pongo.c pongo.h \
 	stuff/cpf_bin.c stuff/cpf_bin.h \
 	stuff/kpf_bin.c stuff/kpf_bin.h \
-	stuff/overlay_bin.c stuff/overlay_bin.h \
+	stuff/overlay_iphoneos_bin.c stuff/overlay_tvos_bin.c stuff/overlay_bin.h \
 	stuff/Pongo_bin.c stuff/Pongo_bin.h \
 	stuff/sep_racer_bin.c stuff/sep_racer_bin.h \
-	stuff/union_bin.c stuff/union_bin.h
+	stuff/union_iphoneos_bin.c stuff/union_tvos_bin.c stuff/union_bin.h
 idevicerestore_CFLAGS += -DHAVE_TURDUS_MERULA $(libDER_CFLAGS) $(libfragmentzip_CFLAGS)
 idevicerestore_LDFLAGS += $(libfragmentzip_LIBS)
 endif

@@ -59,6 +59,7 @@
 #endif
 
 #ifdef HAVE_TURDUS_MERULA
+#include <stdalign.h>
 #include <libfragmentzip/libfragmentzip.h>
 #include "pongo.h"
 
@@ -149,6 +150,26 @@ static void print_module_hash(const char* name, const uint8_t* buf, const size_t
 	}
 	info("\n");
 }
+static inline uint32_t read_u32_le(const uint8_t *p)
+{
+	return (
+			((uint32_t)p[0]      ) |
+			((uint32_t)p[1] <<  8) |
+			((uint32_t)p[2] << 16) |
+			((uint32_t)p[3] << 24)
+			);
+}
+static inline uint64_t read_u64_le(const unsigned char *p)
+{
+	return (uint64_t)p[0] |
+	((uint64_t)p[1] << 8) |
+	((uint64_t)p[2] << 16) |
+	((uint64_t)p[3] << 24) |
+	((uint64_t)p[4] << 32) |
+	((uint64_t)p[5] << 40) |
+	((uint64_t)p[6] << 48) |
+	((uint64_t)p[7] << 56);
+}
 #endif
 
 static void usage(int argc, char* argv[], int err)
@@ -161,26 +182,29 @@ static void usage(int argc, char* argv[], int err)
 	
 #ifdef HAVE_TURDUS_MERULA
 #define TURDUS_MERULA_FLAG_LINE "\nDowngrade options:\n" \
-	"  -w, --downgrade           Restore device to an official firmware using saved TSS record (SHSH)\n" \
-	"                            (The SHSH must match the target firmware version)\n" \
-	"  -o, --tethered            Restore to any official firmware without a matching TSS record (SHSH)\n" \
-	"                            Uses the latest signed SHSH instead\n" \
-	"                            (Requires checkm8 exploit on every reboot)\n" \
-	"  -j, --boot-pongo          Boot pongoOS with the restore chain (no restore performed)\n" \
-	"  --load-shsh PATH          Load a custom SHSH from the given PATH\n" \
-	"  --load-shcblock PATH      Load SEP ciphertext block (shcblock) for A9/A9X devices\n" \
-	"  --load-pteblock PATH      Load SEP ciphertext block (pteblock) for A9/A9X devices\n" \
-	"  --enable-serial           Enable serial output during restore\n" \
-	"  -b, --bbfw PATH           Override BasebandFirmware image\n" \
-	"  -f, --sefw PATH           Override SE Firmware image\n" \
-	"  -r, --rsepfw PATH         Override RestoreSEP image4 payload\n" \
-	"  --signed-manifest PATH    Override BuildManifest for signed firmware components\n" \
-	"  --signed-variant VARIANT  Use given VARIANT to match the build identity to use with custom signed firmware components.\n" \
-	"  --get-shcblock            Acquire shcblock required for SEPROM exploit (fwload race) on A9/A9X devices\n" \
-	"  --get-pteblock            Acquire pteblock required for SEPROM exploit (boot_tz0 race) on A9/A9X devices\n" \
-	"  --allow-unsupport         Allow restore to an unsupported firmware version\n" \
-	"  --api-url URL             Override default API server URL\n" \
-	"  --show-hash               Show the SHA2-384 hashes of embedded modules\n\n" \
+	"  -w, --downgrade                    Restore device to an official firmware using saved TSS record (SHSH)\n" \
+	"                                     (The SHSH must match the target firmware version)\n" \
+	"  -o, --tethered                     Restore to any official firmware without a matching TSS record (SHSH)\n" \
+	"                                     Uses the latest signed SHSH instead\n" \
+	"                                     (Requires checkm8 exploit on every reboot)\n" \
+	"  -j, --boot-pongo                   Boot pongoOS with the restore chain (no restore performed)\n" \
+	"  --load-shsh PATH                   Load a custom SHSH from the given PATH\n" \
+	"  --load-shcblock PATH               Load SEP ciphertext block (shcblock) for A9/A9X devices\n" \
+	"  --load-pteblock PATH               Load SEP ciphertext block (pteblock) for A9/A9X devices\n" \
+	"  --enable-serial                    Enable serial output during restore\n" \
+	"  -b, --bbfw PATH                    Override BasebandFirmware image\n" \
+	"  -f, --sefw PATH                    Override SE Firmware image\n" \
+	"  -r, --rsepfw PATH                  Override RestoreSEP image4 payload\n" \
+	"  --signed-manifest PATH             Override BuildManifest for signed firmware components\n" \
+	"  --signed-variant VARIANT           Use given VARIANT to match the build identity to use with custom signed firmware components.\n" \
+	"  --get-shcblock                     Acquire shcblock required for SEPROM exploit (fwload race) on A9/A9X devices\n" \
+	"  --get-pteblock                     Acquire pteblock required for SEPROM exploit (boot_tz0 race) on A9/A9X devices\n" \
+	"  --allow-unsupport                  Allow restore to an unsupported firmware version\n" \
+	"  --api-url URL                      Override default API server URL\n" \
+	"  --alternative-bbfw-manifest  PATH  Override BuildManifest for alternative signed baseband firmware\n" \
+	"  --alternative-hardware-model PATH  Override hardware model for alternative signed baseband firmware\n" \
+	"  --alternative-bbfw           PATH  Override baseband firmware for alternative signed baseband firmware\n" \
+	"  --show-hash                        Show the SHA2-384 hashes of embedded modules\n\n" \
 	"\nThis is a fork of idevicerestore\n"
 #else
 #define TURDUS_MERULA_FLAG_LINE ""
@@ -354,6 +378,250 @@ static bool get_bsep_type(sep_block_t* bsep, uint32_t* rv)
 		*rv = bsep->type;
 	}
 	return true;
+}
+#define PLATFORM_FLAG_CPID_8960 (1uLL << 0)
+#define PLATFORM_FLAG_CPID_8965 (1uLL << 1)
+#define PLATFORM_FLAG_CPID_7000 (1uLL << 2)
+#define PLATFORM_FLAG_CPID_7001 (1uLL << 3)
+#define PLATFORM_FLAG_CPID_8000 (1uLL << 4)
+#define PLATFORM_FLAG_CPID_8003 (1uLL << 5)
+#define PLATFORM_FLAG_CPID_8001 (1uLL << 6)
+#define PLATFORM_FLAG_CPID_8010 (1uLL << 7)
+#define PLATFORM_FLAG_CPID_8011 (1uLL << 8)
+#define PLATFORM_FLAG_CPID_8012 (1uLL << 9)
+#define PLATFORM_FLAG_CPID_8015 (1uLL << 10)
+
+#define PLATFORM_FLAG_ENV_IOS   (1uLL << 16)
+#define PLATFORM_FLAG_ENV_TVOS  (1uLL << 17)
+
+#define IOS_VERSION_FLAG_7      (1uLL << 32)
+#define IOS_VERSION_FLAG_8      (1uLL << 33)
+#define IOS_VERSION_FLAG_9      (1uLL << 34)
+#define IOS_VERSION_FLAG_10     (1uLL << 35)
+#define IOS_VERSION_FLAG_11     (1uLL << 36)
+#define IOS_VERSION_FLAG_12     (1uLL << 37)
+#define IOS_VERSION_FLAG_13     (1uLL << 38)
+#define IOS_VERSION_FLAG_14     (1uLL << 39)
+#define IOS_VERSION_FLAG_15     (1uLL << 40)
+#define IOS_VERSION_FLAG_16     (1uLL << 41)
+#define IOS_VERSION_FLAG_17     (1uLL << 42)
+#define IOS_VERSION_FLAG_18     (1uLL << 43)
+#define IOS_VERSION_FLAG_26     (1uLL << 44)
+static uint64_t convert_build_to_ios_vflag(int build_major)
+{
+	switch (build_major) {
+		case 11:
+			return IOS_VERSION_FLAG_7;
+		case 12:
+			return IOS_VERSION_FLAG_8;
+		case 13:
+			return IOS_VERSION_FLAG_9;
+		case 14:
+			return IOS_VERSION_FLAG_10;
+		case 15:
+			return IOS_VERSION_FLAG_11;
+		case 16:
+			return IOS_VERSION_FLAG_12;
+		case 17:
+			return IOS_VERSION_FLAG_13;
+		case 18:
+			return IOS_VERSION_FLAG_14;
+		case 19:
+			return IOS_VERSION_FLAG_15;
+		case 20:
+			return IOS_VERSION_FLAG_16;
+		case 21:
+			return IOS_VERSION_FLAG_17;
+		case 22:
+			return IOS_VERSION_FLAG_18;
+		case 23:
+			return IOS_VERSION_FLAG_26;
+		default:
+			return 0;
+	}
+}
+int is_tvos_with_cpid_bdid(uint16_t cpid, uint8_t bdid)
+{
+	switch (cpid) {
+		case 0x7000:
+		{
+			if (bdid == 0x34) { // AppleTV HD
+				return 1;
+			}
+			else if (
+					 bdid == 0x06 || // iPhone 6
+					 bdid == 0x04 || // iPhone 6 Plus
+					 bdid == 0x10 || // iPod touch 6G
+					 bdid == 0x08 || // iPad mini 4
+					 bdid == 0x0A    // iPad mini 4
+					 )
+			{
+				return 0;
+			}
+			break;
+		}
+		case 0x7001:
+		case 0x8000:
+		case 0x8001:
+		case 0x8003:
+		case 0x8010:
+			return 0;
+		case 0x8011:
+		{
+			if (bdid == 0x02) { // AppleTV 4K
+				return 1;
+			}
+			else if (
+					 bdid == 0x0C || // iPad Pro 12.9-inch (2nd generation)
+					 bdid == 0x0E || // iPad Pro 12.9-inch (2nd generation)
+					 bdid == 0x04 || // iPad Pro 10.5-inch
+					 bdid == 0x06    // iPad Pro 10.5-inch
+					 )
+			{
+				return 0;
+			}
+			break;
+		}
+		default:
+			break;
+	}
+	return -1;
+}
+static uint64_t convert_cpid_bdid_to_plat_vflag(uint16_t cpid, uint8_t bdid)
+{
+	int is_tvos = is_tvos_with_cpid_bdid(cpid, bdid);
+	switch (cpid) {
+		case 0x7000:
+		{
+			if (is_tvos == 1) {
+				return PLATFORM_FLAG_ENV_TVOS | PLATFORM_FLAG_CPID_7000;
+			}
+			else if (is_tvos == 0) {
+				return PLATFORM_FLAG_ENV_IOS | PLATFORM_FLAG_CPID_7000;
+			}
+			break;
+		}
+		case 0x7001:
+			return PLATFORM_FLAG_ENV_IOS | PLATFORM_FLAG_CPID_7001;
+		case 0x8000:
+			return PLATFORM_FLAG_ENV_IOS | PLATFORM_FLAG_CPID_8000;
+		case 0x8001:
+			return PLATFORM_FLAG_ENV_IOS | PLATFORM_FLAG_CPID_8001;
+		case 0x8003:
+			return PLATFORM_FLAG_ENV_IOS | PLATFORM_FLAG_CPID_8003;
+		case 0x8010:
+			return PLATFORM_FLAG_ENV_IOS | PLATFORM_FLAG_CPID_8010;
+		case 0x8011:
+		{
+			if (is_tvos == 1) {
+				return PLATFORM_FLAG_ENV_TVOS | PLATFORM_FLAG_CPID_8011;
+			}
+			else if (is_tvos == 0) {
+				return PLATFORM_FLAG_ENV_IOS | PLATFORM_FLAG_CPID_8011;
+			}
+			break;
+		}
+		default:
+			break;
+	}
+	return 0;
+}
+typedef struct {
+	alignas(8) uint32_t magic;
+	uint32_t pad0;
+	uint64_t type;
+	uint64_t fullsize;
+	uint64_t datasize;
+	uint64_t offset;
+	uint64_t tag;
+	uint64_t pad1;
+} rdsk_bin_t;
+static int load_rdsk_flag(const uint8_t* bin, size_t bin_len, const char* name, uint64_t* out_flag)
+{
+	uint8_t* buf = NULL;
+	if (bin_len < sizeof(rdsk_bin_t)) {
+		error("ERROR: %s module too small\n", name);
+		return -1;
+	}
+	int res = posix_memalign((void**)&buf, 8, bin_len);
+	if (res != 0) {
+		error("ERROR: Alloc failed: %s\n", name);
+		return -2;
+	}
+	memset(buf, 0, bin_len);
+	memcpy(buf, bin, bin_len);
+	int success = 0;
+	if (
+		(read_u32_le((uint8_t*)buf + offsetof(rdsk_bin_t, magic)) == 0xca1337feu) &&
+		(read_u64_le((uint8_t*)buf + offsetof(rdsk_bin_t, type)) == 0x1111cafebabe9990uLL)
+		)
+	{
+		if (out_flag) {
+			*out_flag = read_u64_le((uint8_t*)buf + offsetof(rdsk_bin_t, tag));
+		}
+		success = 1;
+	}
+	free(buf);
+	if (!success) {
+		error("ERROR: Invalid %s module\n", name);
+		return -3;
+	}
+	return 0;
+}
+int load_module_flag(const uint8_t* bin, size_t bin_len, uint64_t magic, const char* name, uint64_t* out_flag)
+{
+	if (bin_len < (0x40 + sizeof(uint64_t))) {
+		error("ERROR: %s module too small\n", name);
+		return -1;
+	}
+	
+	uint8_t* buf = NULL;
+	int res = posix_memalign((void**)&buf, 8, bin_len);
+	if (res != 0) {
+		error("ERROR: Alloc failed for %s\n", name);
+		return -2;
+	}
+	
+	memcpy(buf, bin, bin_len);
+	uint8_t* cur = buf;
+	int found = 0;
+	const uint8_t* end = buf + bin_len - (0x40 + sizeof(uint64_t));
+	
+	while (cur <= end) {
+		if ((read_u64_le(cur + 0x00) == (magic | 0x0000cafebabe0000uLL)) &&
+			(read_u64_le(cur + 0x08) == (magic | 0x0000cafebabe0001uLL)) &&
+			(read_u64_le(cur + 0x10) == (magic | 0x0000cafebabe0002uLL)) &&
+			(read_u64_le(cur + 0x18) == (magic | 0x0000cafebabe0003uLL)) &&
+			(read_u64_le(cur + 0x28) == (magic | 0x0000cafebabe000cuLL)) &&
+			(read_u64_le(cur + 0x30) == (magic | 0x0000cafebabe000duLL)) &&
+			(read_u64_le(cur + 0x38) == (magic | 0x0000cafebabe000euLL)) &&
+			(read_u64_le(cur + 0x40) == (magic | 0x0000cafebabe000fuLL))
+			)
+		{
+			if (out_flag) {
+				*out_flag = read_u64_le(cur + 0x20);
+			}
+			found = 1;
+			break;
+		}
+		cur += sizeof(uint64_t);
+	}
+	
+	free(buf);
+	
+	if (!found) {
+		error("ERROR: Invalid %s module\n", name);
+		return -3;
+	}
+	
+	return 0;
+}
+int check_vflag(uint64_t flag, uint64_t mask)
+{
+	if ((flag & mask) == mask) {
+		return 1;
+	}
+	return 0;
 }
 #endif
 
@@ -764,10 +1032,6 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 			}
 		}
 		else if (client->cpid == 0x7000 || client->cpid == 0x7001) {
-			error("ERROR: Unsupported device (CPID: %04x)\n", client->cpid);
-			return -2;
-			// DEBUG
-			/*
 			if (client->sep_fwload_race) {
 				error("ERROR: fwload race is not supported for this device for now.\n");
 				return -2;
@@ -785,7 +1049,6 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 					return -2;
 				}
 			}
-			*/
 		}
 		else if (client->cpid == 0x8950 || client->cpid == 0x8955) {
 			client->is_32bit_soc = 1;
@@ -799,6 +1062,94 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 			}
 		}
 		else {
+			error("ERROR: Unsupported device (CPID: %04x)\n", client->cpid);
+			return -2;
+		}
+		
+		// check module flags
+		if (client->is_32bit_soc == 0) {
+			uint64_t kpf_flag = 0;
+			uint64_t cpf_flag = 0;
+			uint64_t sep_racer_flag = 0;
+			uint64_t overlay_iphoneos_flag = 0;
+			uint64_t overlay_tvos_flag = 0;
+			uint64_t union_iphoneos_flag = 0;
+			uint64_t union_tvos_flag = 0;
+			
+			if (load_rdsk_flag((const uint8_t*)overlay_iphoneos_bin, overlay_iphoneos_bin_len, "overlay.dmg[iPhoneOS]", &overlay_iphoneos_flag)) {
+				return -2;
+			}
+			if (load_rdsk_flag((const uint8_t*)overlay_tvos_bin, overlay_tvos_bin_len, "overlay.dmg[tvOS]", &overlay_tvos_flag)) {
+				return -2;
+			}
+			if (load_rdsk_flag((const uint8_t*)union_iphoneos_bin, union_iphoneos_bin_len, "union.dmg[iPhoneOS]", &union_iphoneos_flag)) {
+				return -2;
+			}
+			if (load_rdsk_flag((const uint8_t*)union_tvos_bin, union_tvos_bin_len, "union.dmg[tvOS]", &union_tvos_flag)) {
+				return -2;
+			}
+			if (load_module_flag((const uint8_t*)cpf_bin, cpf_bin_len, 0xAAAA000000009990uLL, "cpf", &cpf_flag)) {
+				return -2;
+			}
+			if (load_module_flag((const uint8_t*)kpf_bin, kpf_bin_len, 0xBBBB000000009990uLL, "kpf", &kpf_flag)) {
+				return -2;
+			}
+			if (load_module_flag((const uint8_t*)sep_racer_bin, sep_racer_bin_len, 0xCCCC000000009990uLL, "sep_racer", &sep_racer_flag)) {
+				return -2;
+			}
+			client->kpf_flag = kpf_flag;
+			client->cpf_flag = cpf_flag;
+			client->sep_racer_flag = sep_racer_flag;
+			client->overlay_iphoneos_flag = overlay_iphoneos_flag;
+			client->overlay_tvos_flag = overlay_tvos_flag;
+			client->union_iphoneos_flag = union_iphoneos_flag;
+			client->union_tvos_flag = union_tvos_flag;
+		}
+		
+		// check module compatibility
+		int module_unsupported = 0;
+		uint64_t vflag = convert_cpid_bdid_to_plat_vflag(client->cpid, client->bdid);
+		int is_tvos = is_tvos_with_cpid_bdid(client->cpid, client->bdid);
+		if (is_tvos == -1) {
+			debug("Unknown bdid (BDID: 0x%02x)\n", (uint8_t)client->bdid);
+			module_unsupported = 1;
+		}
+		if (is_tvos == 0) { // iPhoneOS
+			if (0 == check_vflag(client->overlay_iphoneos_flag, vflag)) {
+				debug("Found unsupported module (name: %s)\n", "overlay.dmg[iPhoneOS]");
+				module_unsupported = 1;
+			}
+			if (0 == check_vflag(client->union_iphoneos_flag, vflag)) {
+				debug("Found unsupported module (name: %s)\n", "union.dmg[iPhoneOS]");
+				module_unsupported = 1;
+			}
+		}
+		if (is_tvos == 1) { // tvOS
+			if (0 == check_vflag(client->overlay_tvos_flag, vflag)) {
+				debug("Found unsupported module (name: %s)\n", "overlay.dmg[tvOS]");
+				module_unsupported = 1;
+			}
+			if (0 == check_vflag(client->union_tvos_flag, vflag)) {
+				debug("Found unsupported module (name: %s)\n", "union.dmg[tvOS]");
+				module_unsupported = 1;
+			}
+		}
+		if (!(client->cpid == 0x7000) && !(client->cpid == 0x7001)) {
+			if (0 == check_vflag(client->cpf_flag, vflag)) {
+				debug("Found unsupported module (name: %s)\n", "cpf");
+				module_unsupported = 1;
+			}
+		}
+		if (0 == check_vflag(client->kpf_flag, vflag)) {
+			debug("Found unsupported module (name: %s)\n", "kpf");
+			module_unsupported = 1;
+		}
+		if (0 == check_vflag(client->sep_racer_flag, vflag)) {
+			debug("Found unsupported module (name: %s)\n", "sep_racer");
+			module_unsupported = 1;
+		}
+		
+		if (module_unsupported) {
 			error("ERROR: Unsupported device (CPID: %04x)\n", client->cpid);
 			return -2;
 		}
@@ -1300,6 +1651,48 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 
 	info("IPSW Product Version: %s\n", client->version);
 	info("IPSW Product Build: %s Major: %d\n", client->build, client->build_major);
+#ifdef HAVE_TURDUS_MERULA
+	if (client->is_32bit_soc == 0) {
+		if (client->flags & FLAG_TETHERED) {
+			int is_tvos = is_tvos_with_cpid_bdid(client->cpid, client->bdid);
+			uint64_t vflag = convert_build_to_ios_vflag(client->build_major);
+			if (client->build_major >= 14) {
+				if (0 == check_vflag(client->kpf_flag, vflag)) {
+					error("ERROR: Found unsupported module (name: %s)\n", "kpf");
+					return -1;
+				}
+				if (client->build_major == 14 || client->build_major == 15) {
+					if (is_tvos == 0) { // iPhoneOS
+						if (0 == check_vflag(client->union_iphoneos_flag, vflag)) {
+							error("ERROR: Found unsupported module (name: %s)\n", "union.dmg[iPhoneOS]");
+							return -1;
+						}
+					}
+					if (is_tvos == 1) { // tvOS
+						if (0 == check_vflag(client->union_tvos_flag, vflag)) {
+							error("ERROR: Found unsupported module (name: %s)\n", "union.dmg[tvOS]");
+							return -1;
+						}
+					}
+				}
+				else {
+					if (is_tvos == 0) { // iPhoneOS
+						if (0 == check_vflag(client->overlay_iphoneos_flag, vflag)) {
+							error("ERROR: Found unsupported module (name: %s)\n", "overlay.dmg[iPhoneOS]");
+							return -1;
+						}
+					}
+					if (is_tvos == 1) { // tvOS
+						if (0 == check_vflag(client->overlay_tvos_flag, vflag)) {
+							error("ERROR: Found unsupported module (name: %s)\n", "overlay.dmg[tvOS]");
+							return -1;
+						}
+					}
+				}
+			}
+		}
+	}
+#endif
 
 	client->image4supported = is_image4_supported(client);
 	info("Device supports Image4: %s\n", (client->image4supported) ? "true" : "false");
@@ -1534,6 +1927,10 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 				}
 				if (_found != 2) {
 					error("no cryptexSeed\n");
+					return -1;
+				}
+				if (0 == check_vflag(client->cpf_flag, convert_build_to_ios_vflag(client->build_major))) {
+					error("Found unsupported module (name: %s)\n", "cpf");
 					return -1;
 				}
 			}
@@ -3752,8 +4149,10 @@ int main(int argc, char* argv[]) {
 			print_module_hash("cpf", cpf_bin, cpf_bin_len);
 			print_module_hash("kpf", kpf_bin, kpf_bin_len);
 			print_module_hash("sep_racer", sep_racer_bin, sep_racer_bin_len);
-			print_module_hash("overlay.dmg", overlay_bin, overlay_bin_len);
-			print_module_hash("union.dmg", union_bin, union_bin_len);
+			print_module_hash("overlay.dmg[iPhoneOS]", overlay_iphoneos_bin, overlay_iphoneos_bin_len);
+			print_module_hash("overlay.dmg[tvOS]", overlay_tvos_bin, overlay_tvos_bin_len);
+			print_module_hash("union.dmg[iPhoneOS]", union_iphoneos_bin, union_iphoneos_bin_len);
+			print_module_hash("union.dmg[tvOS]", union_tvos_bin, union_tvos_bin_len);
 			return EXIT_SUCCESS;
 				
 		case 17:
@@ -5544,6 +5943,27 @@ int check_firmware_components(struct idevicerestore_client_t* client, plist_t bu
 				if (client->build_major == 14) {
 					info("warn: no rosi digest found in manifest\n");
 					client->need_asr_patch = 1;
+					// modlue check
+					if (client->is_32bit_soc == 0) {
+						int is_tvos = is_tvos_with_cpid_bdid(client->cpid, client->bdid);
+						uint64_t vflag = convert_build_to_ios_vflag(client->build_major);
+						if (0 == check_vflag(client->kpf_flag, vflag)) {
+							error("ERROR: Found unsupported module (name: %s)\n", "kpf");
+							return -1;
+						}
+						if (is_tvos == 0) { // iPhoneOS
+							if (0 == check_vflag(client->union_iphoneos_flag, vflag)) {
+								error("ERROR: Found unsupported module (name: %s)\n", "union.dmg[iPhoneOS]");
+								return -1;
+							}
+						}
+						if (is_tvos == 1) { // tvOS
+							if (0 == check_vflag(client->union_tvos_flag, vflag)) {
+								error("ERROR: Found unsupported module (name: %s)\n", "union.dmg[tvOS]");
+								return -1;
+							}
+						}
+					}
 					break;
 				}
 				return -1;
