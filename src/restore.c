@@ -1857,6 +1857,37 @@ int restore_send_nor(struct idevicerestore_client_t* client, plist_t message)
 	return 0;
 }
 
+int restore_send_host_system_time(struct idevicerestore_client_t* client, plist_t message)
+{
+	logger(LL_INFO, "About to send HostSystemTime...\n");
+	
+	time_t now = time(NULL);
+	logger(LL_DEBUG, "Host system time in second since Epoch is %ld.\n", (long)now);
+	
+	plist_t dict = plist_new_dict();
+	
+	plist_dict_set_item(dict, "SetHostTimeOnDevice", plist_new_uint((uint64_t)now));
+	
+	restore_service_client_t service = _restore_get_service_client_for_data_request(client, message);
+	if (!service) {
+		logger(LL_ERROR, "%s: Unable to connect to service client\n", __func__);
+		plist_free(dict);
+		return -1;
+	}
+	
+	logger(LL_INFO, "Sending HostSystemTime now...\n");
+	restored_error_t restore_error = _restore_service_send(service, dict, PLIST_FORMAT_BINARY);
+	plist_free(dict);
+	_restore_service_free(service);
+	if (restore_error != RESTORE_E_SUCCESS) {
+		logger(LL_ERROR, "Unable to send HostSystemTime\n");
+		return -1;
+	}
+	
+	logger(LL_INFO, "Done sending HostSystemTime\n");
+	return 0;
+}
+
 static const char* restore_get_bbfw_fn_for_element(const char* elem, uint32_t bb_chip_id)
 {
 	struct bbfw_fn_elem_t {
@@ -5006,6 +5037,13 @@ logger(LL_DEBUG, "%s: type = %s\n", __func__, type);
 		else if (!strcmp(type, "RecoveryOSVersionData")) {
 			if (restore_send_recovery_os_version_data(client, message) < 0) {
 				logger(LL_ERROR, "Unable to send RecoveryOSVersionData data\n");
+				return -1;
+			}
+		}
+
+		else if (!strcmp(type, "HostSystemTime")) {
+			if (restore_send_host_system_time(client, message) < 0) {
+				logger(LL_ERROR, "Unable to send HostSystemTime data\n");
 				return -1;
 			}
 		}
