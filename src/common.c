@@ -122,6 +122,7 @@ int read_file(const char* filename, void** data, size_t* size) {
 
 	if (fstat(fileno(file), &fst) < 0) {
 		logger(LL_ERROR, "read_file: fstat: %s\n", strerror(errno));
+		fclose(file);
 		return -1;
 	}
 	length = fst.st_size;
