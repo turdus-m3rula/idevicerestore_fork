@@ -2745,9 +2745,14 @@ static plist_t restore_get_se_firmware_data(struct idevicerestore_client_t* clie
 	}
 
 	/* don't add FirmwareData if not requested via ResponseTags */
-	if (!_wants_firmware_data(arguments)) {
-		logger(LL_DEBUG, "Not adding FirmwareData as it was not requested\n");
-		return response;
+	if (client->cpid == 0x8010 || client->cpid == 0x8011) {
+		// This change will cause SE updates to fail in Icefall
+	}
+	else {
+		if (!_wants_firmware_data(arguments)) {
+			logger(LL_DEBUG, "Not adding FirmwareData as it was not requested\n");
+			return response;
+		}
 	}
 
 	if (build_identity_get_component_path(client->restore->build_identity, comp_name, &comp_path) < 0) {
