@@ -587,6 +587,15 @@ int ipsw_extract_to_file_with_progress(ipsw_archive_t ipsw, const char* infile, 
 	return ret;
 }
 
+static int my_stat(const char *restrict path, struct stat *restrict buf)
+{
+#ifdef WIN32
+	return stat(path, buf);
+#else
+	return lstat(path, buf);
+#endif
+}
+
 int ipsw_extract_to_file(ipsw_archive_t ipsw, const char* infile, const char* outfile)
 {
 	return ipsw_extract_to_file_with_progress(ipsw, infile, outfile, 0);
@@ -703,11 +712,7 @@ int ipsw_extract_to_memory(ipsw_archive_t ipsw, const char* infile, void** pbuff
 	} else {
 		char *filepath = build_path(ipsw->path, infile);
 		struct stat fst;
-#ifdef WIN32
-		if (stat(filepath, &fst) != 0) {
-#else
-		if (lstat(filepath, &fst) != 0) {
-#endif
+		if (my_stat(filepath, &fst) != 0) {
 			logger(LL_ERROR, "%s: stat failed for %s: %s\n", __func__, filepath, strerror(errno));
 			free(filepath);
 			return -1;
@@ -841,11 +846,7 @@ int ipsw_extract_send(ipsw_archive_t ipsw, const char* infile, int blocksize, ip
 	} else {
 		char *filepath = build_path(ipsw->path, infile);
 		struct stat fst;
-#ifdef WIN32
-		if (stat(filepath, &fst) != 0) {
-#else
-		if (lstat(filepath, &fst) != 0) {
-#endif
+		if (my_stat(filepath, &fst) != 0) {
 			logger(LL_ERROR, "%s: stat failed for %s: %s\n", __func__, filepath, strerror(errno));
 			free(filepath);
 			return -1;
@@ -984,11 +985,7 @@ static int ipsw_list_contents_recurse(ipsw_archive_t ipsw, const char *path, ips
 			subpath = strdup(dir->d_name);
 
 		struct stat st;
-#ifdef WIN32
-		ret = stat(fpath, &st);
-#else
-		ret = lstat(fpath, &st);
-#endif
+		ret = my_stat(fpath, &st);
 		if (ret != 0) {
 			logger(LL_ERROR, "%s: stat failed for %s: %s\n", __func__, fpath, strerror(errno));
 			free(fpath);
