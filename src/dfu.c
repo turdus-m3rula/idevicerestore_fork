@@ -34,6 +34,11 @@
 #include "idevicerestore.h"
 #include "common.h"
 
+#ifdef HAVE_TURDUS_MERULA
+#include "turdus/merula.h"
+#include "turdus/pongo.h"
+#endif
+
 static int dfu_progress_callback(irecv_client_t client, const irecv_event_t* event) {
 	if (event->type == IRECV_PROGRESS) {
 		set_progress('DFUP', (double)event->progress/100.0);
@@ -156,11 +161,33 @@ int dfu_send_component(struct idevicerestore_client_t* client, plist_t build_ide
 			}
 		}
 
+#ifdef HAVE_TURDUS_MERULA
+		if (
+			!strcmp(component, "iBSS") && (client->build_major <= 13) && have_arm64_second_stage_iboot(client->cpid) &&
+			(client->alternative_ibss && (client->alternative_ibss_len != 0))
+			)
+		{
+			component_size = client->alternative_ibss_len;
+			component_data = malloc(component_size);
+			if (!component_data) {
+				logger(LL_ERROR, "malloc failed: %s\n", component);
+				free(path);
+				return -1;
+			}
+			memset(component_data, 0, component_size);
+			logger(LL_INFO, "Copying alternative %s\n", component);
+			memcpy(component_data, client->alternative_ibss, component_size);
+		}
+		else {
+#endif
 		if (extract_component(client->ipsw, path, &component_data, &component_size) < 0) {
 			logger(LL_ERROR, "Unable to extract component: %s\n", component);
 			free(path);
 			return -1;
 		}
+#ifdef HAVE_TURDUS_MERULA
+		}
+#endif
 		free(path);
 		path = NULL;
 	}
@@ -176,7 +203,12 @@ int dfu_send_component(struct idevicerestore_client_t* client, plist_t build_ide
 	free(component_data);
 	component_data = NULL;
 
-	if (!client->image4supported && client->build_major > 8 && !(client->flags & FLAG_CUSTOM) && !strcmp(component, "iBEC")) {
+#ifdef HAVE_TURDUS_MERULA
+	uint64_t mask_flag = FLAG_CUSTOM | FLAG_DOWNGRADE;
+#else
+	uint64_t mask_flag = FLAG_CUSTOM;
+#endif
+	if (!client->image4supported && client->build_major > 8 && !(client->flags & mask_flag) && !strcmp(component, "iBEC")) {
 		unsigned char* ticket = NULL;
 		unsigned int tsize = 0;
 		if (tss_response_get_ap_ticket(client->tss, &ticket, &tsize) < 0) {
@@ -445,6 +477,11 @@ int dfu_enter_recovery(struct idevicerestore_client_t* client, plist_t build_ide
 {
 	int mode = 0;
 
+	int waitsec = 10000;
+#ifdef HAVE_TURDUS_MERULA
+	int is_recovery = 0;
+#endif
+
 	if (dfu_client_new(client) < 0) {
 		logger(LL_ERROR, "Unable to connect to DFU device\n");
 		return -1;
@@ -488,6 +525,11 @@ int dfu_enter_recovery(struct idevicerestore_client_t* client, plist_t build_ide
 			}
 			return -1;
 		}
+#ifdef HAVE_TURDUS_MERULA
+		if (client->mode == MODE_RECOVERY) {
+			is_recovery = 1;
+		}
+#endif
 		mutex_unlock(&client->device_event_mutex);
 		dfu_client_new(client);
 
@@ -617,6 +659,41 @@ int dfu_enter_recovery(struct idevicerestore_client_t* client, plist_t build_ide
 			}
 		}
 
+#ifdef HAVE_TURDUS_MERULA
+		if ((client->flags & FLAG_DOWNGRADE) && is_arm64_soc(client->cpid)) {
+			logger(LL_INFO, "Checking boot-nonce hash\n");
+			int hashr = validate_boot_nonce_hash(client);
+			if (hashr) {
+				mutex_unlock(&client->device_event_mutex);
+				logger(LL_ERROR, "boot-nonce hash validation failed (err = %d)\n", hashr);
+				irecv_close(client->dfu->client);
+				client->dfu->client = NULL;
+				return -1;
+			}
+			
+			logger(LL_INFO, "Checking ECID\n");
+			int ecidr = validate_ECID(client);
+			if (ecidr) {
+				mutex_unlock(&client->device_event_mutex);
+				logger(LL_ERROR, "ECID validation failed (err = %d)\n", ecidr);
+				irecv_close(client->dfu->client);
+				client->dfu->client = NULL;
+				return -1;
+			}
+			if (have_arm64_single_stage_iboot(client->cpid)) {
+				if (!is_recovery) {
+					mutex_unlock(&client->device_event_mutex);
+					if (!(client->flags & FLAG_QUIT)) {
+						logger(LL_ERROR, "Device did not reconnect in recovery mode. Possibly invalid iBSS. Reset device and try again.\n");
+					}
+					return -1;
+				}
+				dfu_client_free(client);
+				goto skip_ibec;
+			}
+		}
+#endif
+
 		/* send iBEC */
 		if (dfu_send_component(client, build_identity, "iBEC") < 0) {
 			mutex_unlock(&client->device_event_mutex);
@@ -650,15 +727,77 @@ int dfu_enter_recovery(struct idevicerestore_client_t* client, plist_t build_ide
 		}
 		return -1;
 	}
+
+#ifdef HAVE_TURDUS_MERULA
+	int retry = 0;
+	if ((client->flags & FLAG_DOWNGRADE) && have_arm64_second_stage_iboot(client->cpid)) {
+		logger(LL_DEBUG, "Waiting for device to reconnect in yolo (checkra1n) DFU mode...\n");
+		logger(LL_INFO, "If there is no response after a few seconds, please unplug and replug the lightning cable manually.\n");
+		cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 1000000);
+	yolo_retry:
+		if (client->mode != MODE_DFU || (client->flags & FLAG_QUIT)) {
+			mutex_unlock(&client->device_event_mutex);
+			if (!(client->flags & FLAG_QUIT)) {
+				logger(LL_ERROR, "Device did not reconnect in yolo (checkra1n) DFU mode. Possibly invalid %s. Reset device and try again.\n", (client->build_major > 8) ? "iBEC" : "iBSS");
+			}
+			return -1;
+		}
+		if (dfu_get_yolo_checkra1n(client) != 0) {
+			if (retry > 3) {
+			error:
+				if (!(client->flags & FLAG_QUIT)) {
+					logger(LL_ERROR, "Device did not reconnect in yolo (checkra1n) DFU mode. Possibly invalid %s. Reset device and try again.\n", (client->build_major > 8) ? "iBEC" : "iBSS");
+				}
+				return -1;
+			}
+			retry++;
+			irecv_client_t _client = client->dfu->client;
+			if (!_client) {
+				goto error;
+			}
+			client->dfu->client = irecv_reconnect(_client, 1);
+			if (!client->dfu->client) {
+				if (!(client->flags & FLAG_QUIT)) {
+					logger(LL_ERROR, "Unable to reconnect\n");
+				}
+				return -1;
+			}
+			goto yolo_retry;
+		}
+		// send pongo
+		if (send_pongo_image(client) != 0) {
+			if (!(client->flags & FLAG_QUIT)) {
+				logger(LL_ERROR, "Failed to upload pongo image\n");
+			}
+			return -1;
+		}
+		waitsec = 100000;
+		logger(LL_DEBUG, "Waiting for device to disconnect...\n");
+		cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, waitsec);
+	}
+#endif
+
 	logger(LL_DEBUG, "Waiting for device to reconnect in recovery mode...\n");
-	cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 10000);
+	cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, waitsec);
 	if (client->mode != MODE_RECOVERY || (client->flags & FLAG_QUIT)) {
 		mutex_unlock(&client->device_event_mutex);
 		if (!(client->flags & FLAG_QUIT)) {
+#ifdef HAVE_TURDUS_MERULA
+			if ((client->flags & FLAG_DOWNGRADE) && have_arm64_second_stage_iboot(client->cpid)) {
+				logger(LL_ERROR, "Device did not reconnect in recovery mode. Possibly failed to upload pongo. Reset device and try again.\n");
+			}
+			else {
+#endif
 			logger(LL_ERROR, "Device did not reconnect in recovery mode. Possibly invalid %s. Reset device and try again.\n", (client->build_major > 8) ? "iBEC" : "iBSS");
+#ifdef HAVE_TURDUS_MERULA
+			}
+#endif
 		}
 		return -1;
 	}
+#ifdef HAVE_TURDUS_MERULA
+skip_ibec:
+#endif
 	mutex_unlock(&client->device_event_mutex);
 
 	if (recovery_client_new(client) < 0) {

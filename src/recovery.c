@@ -36,6 +36,10 @@
 #include "restore.h"
 #include "recovery.h"
 
+#ifdef HAVE_TURDUS_MERULA
+#include "turdus/merula.h"
+#endif
+
 static int recovery_progress_callback(irecv_client_t client, const irecv_event_t* event)
 {
 	if (event->type == IRECV_PROGRESS) {
@@ -473,7 +477,7 @@ int recovery_send_ramdisk(struct idevicerestore_client_t* client, plist_t build_
 	free(value);
 	value = NULL;
 
-	if (recovery_send_component(client, build_identity, component) < 0) {
+	if (recovery_send_ramdisk_component(client, build_identity, component) < 0) {
 		logger(LL_ERROR, "Unable to send %s to device.\n", component);
 		return -1;
 	}

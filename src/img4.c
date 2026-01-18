@@ -224,7 +224,7 @@ static unsigned int asn1_get_element(const unsigned char* data, unsigned char* t
 	return off;
 }
 
-static const unsigned char *asn1_find_element(unsigned int index, unsigned char type, const unsigned char* data)
+const unsigned char *asn1_find_element(unsigned int index, unsigned char type, const unsigned char* data)
 {
 	unsigned char el_type = 0;
 	unsigned char el_size = 0;
@@ -268,7 +268,7 @@ static const unsigned char *asn1_find_element(unsigned int index, unsigned char 
 	return &data[off];
 }
 
-static const char *_img4_get_component_tag(const char *compname)
+const char *_img4_get_component_tag(const char *compname)
 {
 	struct comp_tags {
 		const char *comp;
@@ -388,6 +388,12 @@ static const char *_img4_get_component_tag(const char *compname)
 		{ "iBootTest", "itst" },
 		{ "rfta", "rfta" },
 		{ "rfts", "rfts" },
+#ifdef HAVE_TURDUS_MERULA
+		{ "iBootTethered", "rlgo" },
+		{ "iBootTethered2", "ibss" },
+		{ "iBoot32Tethered", "ibob" },
+		{ "SEPTethered", "sepi" },
+#endif
 		{ NULL, NULL }
 	};
 	int i = 0;
@@ -445,6 +451,10 @@ int img4_stitch_component(const char* component_name, const void* component_data
 			"Ap,RestoreSecurePageTableMonitor",
 			"Ap,RestoreTrustedExecutionMonitor",
 			"Ap,RestorecL4",
+			"iBootTethered",
+			"iBootTethered2",
+			"iBoot32Tethered",
+			"SEPTethered",
 			NULL
 		};
 		int i = 0;

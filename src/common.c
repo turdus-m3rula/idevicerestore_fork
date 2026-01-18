@@ -73,6 +73,9 @@ struct idevicerestore_mode_t idevicerestore_modes[] = {
 	{  4, "Restore"  },
 	{  5, "Normal"   },
 	{  6, "Port DFU" },
+#ifdef HAVE_TURDUS_MERULA
+	{  7, "pongoOS"  },
+#endif
 };
 
 int idevicerestore_debug = 0;

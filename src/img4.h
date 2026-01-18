@@ -29,6 +29,9 @@ extern "C" {
 int img4_stitch_component(const char* component_name, const void* component_data, size_t component_size, plist_t parameters, plist_t tss_response, void** img4_data, size_t *img4_size);
 int img4_create_local_manifest(plist_t request, plist_t build_identity, plist_t* manifest);
 
+const unsigned char *asn1_find_element(unsigned int index, unsigned char type, const unsigned char* data);
+const char *_img4_get_component_tag(const char *compname);
+
 #ifdef __cplusplus
 }
 #endif

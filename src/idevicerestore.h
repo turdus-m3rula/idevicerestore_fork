@@ -47,6 +47,12 @@ extern "C" {
 #define FLAG_NO_RESTORE      (1 << 11)
 #define FLAG_IGNORE_ERRORS   (1 << 12)
 #define FLAG_KEEP_PERS       (1 << 13)
+#ifdef HAVE_TURDUS_MERULA
+#define FLAG_DOWNGRADE       (1 << 20)
+#define FLAG_BOOT_PONGO      (1 << 21)
+#define FLAG_TETHERED        (1 << 22)
+#define FLAG_ALLOW_UNSUPPORTED (1 << 23)
+#endif
 #define FLAG_IN_PROGRESS     (1 << 30)
 
 #define RESTORE_VARIANT_ERASE_INSTALL      "Erase Install (IPSW)"
