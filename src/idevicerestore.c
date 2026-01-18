@@ -744,54 +744,54 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 			client->overlay_tvos_flag = overlay_tvos_flag;
 			client->union_iphoneos_flag = union_iphoneos_flag;
 			client->union_tvos_flag = union_tvos_flag;
-		}
-		
-		// check module compatibility
-		int module_unsupported = 0;
-		uint64_t vflag = convert_cpid_bdid_to_plat_vflag(client->cpid, client->bdid);
-		int is_tvos = is_tvos_with_cpid_bdid(client->cpid, client->bdid);
-		if (is_tvos == -1) {
-			logger(LL_ERROR, "Unknown bdid (BDID: 0x%02x)\n", (uint8_t)client->bdid);
-			module_unsupported = 1;
-		}
-		if (is_tvos == 0) { // iPhoneOS
-			if (0 == check_vflag(client->overlay_iphoneos_flag, vflag)) {
-				logger(LL_DEBUG, "Found unsupported module (name: %s)\n", "overlay.dmg[iPhoneOS]");
+			
+			// check module compatibility
+			int module_unsupported = 0;
+			uint64_t vflag = convert_cpid_bdid_to_plat_vflag(client->cpid, client->bdid);
+			int is_tvos = is_tvos_with_cpid_bdid(client->cpid, client->bdid);
+			if (is_tvos == -1) {
+				logger(LL_ERROR, "Unknown bdid (BDID: 0x%02x)\n", (uint8_t)client->bdid);
 				module_unsupported = 1;
 			}
-			if (0 == check_vflag(client->union_iphoneos_flag, vflag)) {
-				logger(LL_DEBUG, "Found unsupported module (name: %s)\n", "union.dmg[iPhoneOS]");
+			if (is_tvos == 0) { // iPhoneOS
+				if (0 == check_vflag(client->overlay_iphoneos_flag, vflag)) {
+					logger(LL_DEBUG, "Found unsupported module (name: %s)\n", "overlay.dmg[iPhoneOS]");
+					module_unsupported = 1;
+				}
+				if (0 == check_vflag(client->union_iphoneos_flag, vflag)) {
+					logger(LL_DEBUG, "Found unsupported module (name: %s)\n", "union.dmg[iPhoneOS]");
+					module_unsupported = 1;
+				}
+			}
+			if (is_tvos == 1) { // tvOS
+				if (0 == check_vflag(client->overlay_tvos_flag, vflag)) {
+					logger(LL_DEBUG, "Found unsupported module (name: %s)\n", "overlay.dmg[tvOS]");
+					module_unsupported = 1;
+				}
+				if (0 == check_vflag(client->union_tvos_flag, vflag)) {
+					logger(LL_DEBUG, "Found unsupported module (name: %s)\n", "union.dmg[tvOS]");
+					module_unsupported = 1;
+				}
+			}
+			if (!is_a8_variant_soc(client->cpid)) {
+				if (0 == check_vflag(client->cpf_flag, vflag)) {
+					logger(LL_DEBUG, "Found unsupported module (name: %s)\n", "cpf");
+					module_unsupported = 1;
+				}
+			}
+			if (0 == check_vflag(client->kpf_flag, vflag)) {
+				logger(LL_DEBUG, "Found unsupported module (name: %s)\n", "kpf");
 				module_unsupported = 1;
 			}
-		}
-		if (is_tvos == 1) { // tvOS
-			if (0 == check_vflag(client->overlay_tvos_flag, vflag)) {
-				logger(LL_DEBUG, "Found unsupported module (name: %s)\n", "overlay.dmg[tvOS]");
+			if (0 == check_vflag(client->sep_racer_flag, vflag)) {
+				logger(LL_DEBUG, "Found unsupported module (name: %s)\n", "sep_racer");
 				module_unsupported = 1;
 			}
-			if (0 == check_vflag(client->union_tvos_flag, vflag)) {
-				logger(LL_DEBUG, "Found unsupported module (name: %s)\n", "union.dmg[tvOS]");
-				module_unsupported = 1;
+			
+			if (module_unsupported) {
+				logger(LL_ERROR, "Unsupported device (CPID: %04x)\n", client->cpid);
+				return -2;
 			}
-		}
-		if (!is_a8_variant_soc(client->cpid)) {
-			if (0 == check_vflag(client->cpf_flag, vflag)) {
-				logger(LL_DEBUG, "Found unsupported module (name: %s)\n", "cpf");
-				module_unsupported = 1;
-			}
-		}
-		if (0 == check_vflag(client->kpf_flag, vflag)) {
-			logger(LL_DEBUG, "Found unsupported module (name: %s)\n", "kpf");
-			module_unsupported = 1;
-		}
-		if (0 == check_vflag(client->sep_racer_flag, vflag)) {
-			logger(LL_DEBUG, "Found unsupported module (name: %s)\n", "sep_racer");
-			module_unsupported = 1;
-		}
-		
-		if (module_unsupported) {
-			logger(LL_ERROR, "Unsupported device (CPID: %04x)\n", client->cpid);
-			return -2;
 		}
 		
 		logger(LL_DEBUG, "Found supported device (CPID: %04x)\n", client->cpid);
