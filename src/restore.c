@@ -1681,13 +1681,13 @@ int restore_send_nor(struct idevicerestore_client_t* client, plist_t message)
 
 #ifdef HAVE_TURDUS_MERULA
 	if (client->flags & FLAG_TETHERED) {
-		if (client->t_LLB) { // override LlbImageData
+		if (client->t_LLB.im4p.data && client->t_LLB.im4p.length) { // override LlbImageData
 			logger(LL_INFO, "Using cached LLB data\n");
 			free(component_data);
 			component_data = NULL;
-			component_size = client->t_LLB_len;
+			component_size = client->t_LLB.im4p.length;
 			component_data = malloc(component_size);
-			memcpy(component_data, client->t_LLB, component_size);
+			memcpy(component_data, client->t_LLB.im4p.data, component_size);
 		}
 	}
 #endif
@@ -1752,13 +1752,13 @@ int restore_send_nor(struct idevicerestore_client_t* client, plist_t message)
 		if (client->flags & FLAG_TETHERED) {
 #define OVERRIDE_FW_COMP(name) { \
 if (!strcmp(component, #name)) { \
-if (client->t_##name) { \
+if (client->t_##name.im4p.data) { \
 logger(LL_INFO, "using cached %s data\n", #name); \
 free(component_data); \
 component_data = NULL; \
-component_size = client->t_##name##_len; \
+component_size = client->t_##name.im4p.length; \
 component_data = malloc(component_size); \
-memcpy(component_data, client->t_##name, component_size); \
+memcpy(component_data, client->t_##name.im4p.data, component_size); \
 } \
 } \
 }
@@ -1883,15 +1883,15 @@ memcpy(component_data, client->t_##name, component_size); \
 	plist_free(firmware_files);
 #ifdef HAVE_TURDUS_MERULA
 	if (client->flags & FLAG_TETHERED) { // A10+, iOS <= 13: append sepi image (prevent iboot panic loop)
-		if (have_arm64_single_stage_iboot(client->cpid) && client->build_major <= 17 && client->rsepfw) {
+		if (have_arm64_single_stage_iboot(client->cpid) && client->build_major <= 17 && client->rsep.data) {
 			const char* my_comp_name = "SEP";
 			logger(LL_INFO, "Append SEPI image (using cached SEP data)\n");
-			size_t sepi_size = client->rsepfw_len;
+			size_t sepi_size = client->rsep.length;
 			void* sepi_data = malloc(sepi_size);
 			unsigned char* nor_data = NULL;
 			size_t nor_size = 0;
-			memcpy(sepi_data, client->rsepfw, sepi_size);
-			if (personalize_component(client, my_comp_name, sepi_data, sepi_size, client->tss, (void **)&nor_data, &nor_size) < 0) {
+			memcpy(sepi_data, client->rsep.data, sepi_size);
+			if (personalize_component(client, my_comp_name, sepi_data, sepi_size, client->rsep.tss, (void **)&nor_data, &nor_size) < 0) {
 				free(nor_data);
 				free(sepi_data);
 				logger(LL_ERROR, "Unable to get personalized component: %s\n", my_comp_name);
@@ -1948,23 +1948,25 @@ memcpy(component_data, client->t_##name, component_size); \
 			return -1;
 		}
 
+        plist_t sep_tss = client->tss;
 #ifdef HAVE_TURDUS_MERULA
 		// prevent iboot panic loop // TODO: better handle
 		if (client->flags & FLAG_TETHERED) {
 			if ((client->build_major >= 18) && have_arm64_single_stage_iboot(client->cpid)) { // A10+, iOS 14+
 				// This device doesn't use sep img4 on fs so it's fine anyway
-				if (client->rsepfw) {
+				if (client->rsep.data) {
 					logger(LL_INFO, "Using cached SEP data\n");
 					free(component_data);
 					component_data = NULL;
-					component_size = client->rsepfw_len;
+					component_size = client->rsep.length;
 					component_data = malloc(component_size);
-					memcpy(component_data, client->rsepfw, component_size);
+					memcpy(component_data, client->rsep.data, component_size);
+                    sep_tss = client->rsep.tss;
 				}
 			}
 		}
-#endif
 		ret = personalize_component(client, component, component_data, component_size, client->tss, &personalized_data, &personalized_size);
+#endif
 		free(component_data);
 		component_data = NULL;
 		component_size = 0;
@@ -2494,16 +2496,12 @@ static int restore_send_baseband_data(struct idevicerestore_client_t* client, pl
 
 		plist_t bb_identity = client->restore->build_identity;
 #ifdef HAVE_TURDUS_MERULA
-		if ((client->signed_identity == NULL) || client->bbfw == NULL) {
+		if ((client->bbfw.identity == NULL) || client->bbfw.data == NULL) {
 			bb_identity = client->restore->build_identity;
 		}
 		else {
 			logger(LL_DEBUG, "Using another build manifest\n");
-			bb_identity = client->signed_identity;
-			if ((client->alternative_bbfw_identity != NULL) && client->alternative_bbfw != NULL) {
-				logger(LL_DEBUG, "Using alternative build manifest\n");
-				bb_identity = client->alternative_bbfw_identity;
-			}
+			bb_identity = client->bbfw.identity;
 		}
 #endif
 		tss_parameters_add_from_manifest(parameters, bb_identity, true);
@@ -2546,7 +2544,7 @@ static int restore_send_baseband_data(struct idevicerestore_client_t* client, pl
 	plist_t bbfw_path = NULL;
 	char* bbfwpath = NULL;
 #ifdef HAVE_TURDUS_MERULA
-	if ((client->signed_identity == NULL) || client->bbfw == NULL) {
+	if ((client->bbfw.identity == NULL) || client->bbfw.data == NULL) {
 #endif
 	bbfw_path = plist_access_path(client->restore->build_identity, 4, "Manifest", "BasebandFirmware", "Info", "Path");
 	if (!bbfw_path || plist_get_node_type(bbfw_path) != PLIST_STRING) {
@@ -2578,18 +2576,9 @@ static int restore_send_baseband_data(struct idevicerestore_client_t* client, pl
 #ifdef HAVE_TURDUS_MERULA
 	}
 	else {
-		uint8_t* bbfw_alt = NULL;
-		size_t bbfw_alt_len = 0;
-		if ((client->alternative_bbfw_identity != NULL) && client->alternative_bbfw != NULL) {
-			logger(LL_DEBUG, "Using alternative baseband firmware\n");
-			bbfw_alt = client->alternative_bbfw;
-			bbfw_alt_len = client->alternative_bbfw_len;
-		}
-		else {
-			logger(LL_DEBUG, "Using another baseband firmware\n");
-			bbfw_alt = client->bbfw;
-			bbfw_alt_len = client->bbfw_len;
-		}
+        logger(LL_DEBUG, "Using another baseband firmware\n");
+        uint8_t* bbfw_alt = client->bbfw.data;
+        size_t bbfw_alt_len = client->bbfw.length;
 		bbfwtmp = get_temp_filename("bbfw_"); // client->restore->bbfw;
 		if (!bbfwtmp) {
 			size_t l = strlen(client->udid);
@@ -2962,12 +2951,12 @@ static plist_t restore_get_se_firmware_data(struct idevicerestore_client_t* clie
 
 #ifdef HAVE_TURDUS_MERULA
 	if (response == NULL) {
-		if ((client->signed_identity != NULL) && (client->sefw != NULL)) {
+		if ((client->sefw.identity != NULL) && (client->sefw.data != NULL)) {
 			logger(LL_INFO, "Using another build manifest\n");
 			use_latest_sefw = 1;
 			
 			/* select new SE build_identity */
-			se_identity = client->signed_identity;
+			se_identity = client->sefw.identity;
 			
 			/* create new SE request */
 			request = tss_request_new(NULL);
@@ -3051,14 +3040,14 @@ static plist_t restore_get_se_firmware_data(struct idevicerestore_client_t* clie
 #ifdef HAVE_TURDUS_MERULA
 	else {
 		logger(LL_INFO, "using another se firmware\n");
-		component_size = client->sefw_len;
+		component_size = client->sefw.length;
 		component_data = malloc(component_size);
 		if (!component_data) {
 			plist_free(response);
 			logger(LL_ERROR, "Unable to alloc '%s' component\n", comp_name);
 			return NULL;
 		}
-		memcpy(component_data, client->sefw, component_size);
+		memcpy(component_data, client->sefw.data, component_size);
 	}
 #endif
 
@@ -3928,7 +3917,7 @@ static plist_t restore_get_cryptex1_firmware_data(struct idevicerestore_client_t
 	plist_t my_build_identity = client->restore->build_identity;
 #ifdef HAVE_TURDUS_MERULA
 	if (client->flags & FLAG_TETHERED) {
-		my_build_identity = client->signed_identity;
+		my_build_identity = client->base.identity;
 	}
 #endif
 	if (!client || !client->restore || !my_build_identity) {

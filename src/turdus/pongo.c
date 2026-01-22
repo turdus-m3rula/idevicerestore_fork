@@ -491,7 +491,7 @@ logger(LL_INFO, "Sent %s msg\n", name); \
 		}
 		
 		if (CURRENT_STAGE == SEND_APIGM4TICKET) {
-			PONGO_SEND_BUFFER(idr_client->img4_manifest, idr_client->img4_manifest_len, "ApImg4Ticket");
+			PONGO_SEND_BUFFER(idr_client->image4_rsep.im4m.data, idr_client->image4_rsep.im4m.length, "ApImg4Ticket");
 			CURRENT_STAGE = LOAD_APIGM4TICKET;
 			continue;
 		}
@@ -503,7 +503,7 @@ logger(LL_INFO, "Sent %s msg\n", name); \
 		}
 		
 		if (CURRENT_STAGE == SEND_APIGM4TICKET_HASH) {
-			PONGO_SEND_BUFFER(idr_client->img4_manifest_hash, idr_client->img4_manifest_hash_len, "ApImg4TicketHash");
+			PONGO_SEND_BUFFER(idr_client->image4_rsep.im4m.hash, idr_client->image4_rsep.im4m.hash_length, "ApImg4TicketHash");
 			CURRENT_STAGE = LOAD_APIGM4TICKET_HASH;
 			continue;
 		}
@@ -515,7 +515,7 @@ logger(LL_INFO, "Sent %s msg\n", name); \
 		}
 		
 		if (CURRENT_STAGE == SEND_RSEP) {
-			PONGO_SEND_BUFFER(idr_client->rsep_img4, idr_client->rsep_img4_len, "RestoreSEP");
+			PONGO_SEND_BUFFER(idr_client->image4_rsep.img4.data, idr_client->image4_rsep.img4.length, "RestoreSEP");
 			CURRENT_STAGE = LOAD_RSEP;
 			continue;
 		}
@@ -527,7 +527,7 @@ logger(LL_INFO, "Sent %s msg\n", name); \
 		}
 		
 		if (CURRENT_STAGE == SEND_SEP_PAYLOAD) {
-			PONGO_SEND_BUFFER(idr_client->sepi_im4p, idr_client->sepi_im4p_len, "SEP");
+			PONGO_SEND_BUFFER(idr_client->image4_sepi.im4p.data, idr_client->image4_sepi.im4p.length, "SEP");
 			CURRENT_STAGE = LOAD_SEP_PAYLOAD;
 			continue;
 		}

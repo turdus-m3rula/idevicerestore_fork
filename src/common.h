@@ -88,6 +88,29 @@ struct idevicerestore_mode_t {
 	const char* string;
 };
 
+#ifdef HAVE_TURDUS_MERULA
+typedef struct {
+	char* alternative_hwmodel;
+	char* variant;
+	plist_t manifest;
+	plist_t identity;
+	uint8_t* data;
+	size_t length;
+	plist_t tss;
+} firmware_component_t;
+typedef struct {
+	void* data;
+	size_t length;
+	void* hash;
+	size_t hash_length;
+} image_component_t;
+typedef struct {
+	image_component_t im4p;
+	image_component_t im4m;
+	image_component_t img4;
+} image4_component_t;
+#endif
+
 struct idevicerestore_client_t {
 #ifdef HAVE_TURDUS_MERULA
 	uint64_t flags;
@@ -140,7 +163,7 @@ struct idevicerestore_client_t {
 	int async_err;
 	
 #ifdef HAVE_TURDUS_MERULA
-	uint64_t kpf_flag ;
+	uint64_t kpf_flag;
 	uint64_t cpf_flag;
 	uint64_t sep_racer_flag;
 	uint64_t overlay_iphoneos_flag;
@@ -163,61 +186,28 @@ struct idevicerestore_client_t {
 	int sep_boot_tz0_race;
 	
 	char* cryptex1_nonce_seed;
-	void* sepi_im4p; // 'sepi' im4p
-	size_t sepi_im4p_len;
-	void* rsep_img4; // signed 'rsep' img4
-	size_t rsep_img4_len;
-	void* img4_manifest;
-	uint64_t img4_manifest_len;
-	void* img4_manifest_hash;
-	size_t img4_manifest_hash_len;
+	
+	image4_component_t image4_sepi;
+	image4_component_t image4_rsep;
+	
 	void* sep_shellcode_block;
 	size_t sep_shellcode_block_len;
 	
-	int use_specific_fwver_component;
-	char* signed_variant;
-	plist_t signed_manifest;
-	plist_t signed_identity;
+	firmware_component_t bbfw;
+	firmware_component_t sefw;
+	firmware_component_t rsep;
+	firmware_component_t base; // base->data: ibss image
 	
-	uint8_t* bbfw;
-	size_t bbfw_len;
-	
-	uint8_t* sefw;
-	size_t sefw_len;
-	
-	uint8_t* rsepfw;
-	size_t rsepfw_len;
-	// ios 9 haxx
-	uint8_t* alternative_ibss;
-	size_t alternative_ibss_len;
-	
-	const char* alternative_hardware_model;
-	plist_t alternative_bbfw_manifest;
-	plist_t alternative_bbfw_identity;
-	uint8_t* alternative_bbfw;
-	size_t alternative_bbfw_len;
-	
-	// tethered
-	uint8_t* t_LLB;
-	size_t t_LLB_len;
-	uint8_t* t_AppleLogo;
-	size_t t_AppleLogo_len;
-	uint8_t* t_BatteryCharging0;
-	size_t t_BatteryCharging0_len;
-	uint8_t* t_BatteryCharging1;
-	size_t t_BatteryCharging1_len;
-	uint8_t* t_BatteryFull;
-	size_t t_BatteryFull_len;
-	uint8_t* t_BatteryLow0;
-	size_t t_BatteryLow0_len;
-	uint8_t* t_BatteryLow1;
-	size_t t_BatteryLow1_len;
-	uint8_t* t_BatteryPlugin;
-	size_t t_BatteryPlugin_len;
-	uint8_t* t_RecoveryMode;
-	size_t t_RecoveryMode_len;
-	uint8_t* t_iBoot;
-	size_t t_iBoot_len;
+	image4_component_t t_LLB;
+	image4_component_t t_AppleLogo;
+	image4_component_t t_BatteryCharging0;
+	image4_component_t t_BatteryCharging1;
+	image4_component_t t_BatteryFull;
+	image4_component_t t_BatteryLow0;
+	image4_component_t t_BatteryLow1;
+	image4_component_t t_BatteryPlugin;
+	image4_component_t t_RecoveryMode;
+	image4_component_t t_iBoot;
 #endif
 };
 

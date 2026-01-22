@@ -18,6 +18,7 @@
 #include <libtatsu/tss.h>
 #include <plist/plist.h>
 
+#include <libfragmentzip/libfragmentzip.h>
 #include <libimobiledevice-glue/sha.h>
 #include <libDER/libDER_config.h>
 #include <libDER/libDER.h>
@@ -454,6 +455,142 @@ int check_vflag(uint64_t flag, uint64_t mask)
 }
 
 #pragma mark - idevicerestore
+int load_firmware_component_data(const char* path, firmware_component_t* comp, const char* name)
+{
+	if (!path || !*path) {
+		logger(LL_ERROR, "PATH argument for --%s must not be empty!\n", name);
+		return -1;
+	}
+	if (comp->data) {
+		free(comp->data);
+		comp->data = NULL;
+		comp->length = 0;
+	}
+	if (read_file_safe(path, (void**)&comp->data, &comp->length, 0x8000000) != 0) {
+		return -1;
+	}
+	return 0;
+}
+
+int load_firmware_component_plist(const char* path, firmware_component_t* comp, const char* name)
+{
+	if (!path || !*path) {
+		logger(LL_ERROR, "PATH argument for --%s-manifest must not be empty!\n", name);
+		return -1;
+	}
+	
+	if (comp->manifest) {
+		plist_free(comp->manifest);
+		comp->manifest = NULL;
+	}
+	
+	uint8_t* bin = NULL;
+	size_t len = 0;
+	if (read_file_safe(path, (void**)&bin, &len, 0x4000000) != 0) {
+		return -1;
+	}
+	
+	if (len >= 8 && memcmp(bin, "bplist00", 8) == 0) {
+		plist_from_bin((const char *)bin, len, &comp->manifest);
+	}
+	else {
+		plist_from_xml((const char *)bin, len, &comp->manifest);
+	}
+	free(bin);
+	return (comp->manifest) ? 0 : -1;
+}
+
+int get_identity_for_component(struct idevicerestore_client_t* client, firmware_component_t* comp)
+{
+	if (comp->manifest == NULL) {
+		logger(LL_ERROR, "Unable to find Manifest\n");
+		return -1;
+	}
+	if (comp->variant) {
+		const char* hwmodel = comp->alternative_hwmodel != NULL ? (const char*)comp->alternative_hwmodel : client->device->hardware_model;
+		comp->identity = build_manifest_get_build_identity_for_model_with_variant(comp->manifest, hwmodel, comp->variant, 1);
+	}
+	else {
+		comp->identity = build_manifest_get_build_identity_for_model_with_variant(comp->manifest, client->device->hardware_model, RESTORE_VARIANT_ERASE_INSTALL, 0);
+	}
+	if (comp->identity == NULL) {
+		return -1;
+	}
+	return 0;
+}
+
+int download_component_by_name(fragmentzip_t* fragment, const char* name, const char* altname, firmware_component_t* comp)
+{
+	const char* basename = NULL;
+	char* value = NULL;
+	plist_t manifest_node = NULL;
+	plist_t component_node = NULL;
+	plist_t info_node = NULL;
+	plist_t node = NULL;
+	if (comp->identity == NULL) {
+		logger(LL_ERROR, "Unable to find Manifest identity\n");
+		return -1;
+	}
+	if (name == NULL) {
+		logger(LL_ERROR, "Unable to find node name\n");
+		return -1;
+	}
+	if (fragment == NULL) {
+		logger(LL_ERROR, "Unable to find fragmentzip\n");
+		return -1;
+	}
+	manifest_node = plist_dict_get_item(comp->identity, "Manifest");
+	if (!manifest_node || plist_get_node_type(manifest_node) != PLIST_DICT) {
+		logger(LL_ERROR, "Unable to find Manifest node\n");
+		return -1;
+	}
+	
+	basename = name;
+	component_node = plist_dict_get_item(manifest_node, basename);
+	if (!component_node || plist_get_node_type(component_node) != PLIST_DICT) {
+		if (altname) {
+			basename = altname;
+			component_node = plist_dict_get_item(manifest_node, basename);
+		}
+		if (!component_node || plist_get_node_type(component_node) != PLIST_DICT) {
+			logger(LL_ERROR, "Unable to find %s node\n", basename);
+			return -1;
+		}
+	}
+	
+	info_node = plist_dict_get_item(component_node, "Info");
+	if (!info_node || plist_get_node_type(info_node) != PLIST_DICT) {
+		logger(LL_ERROR, "Unable to find Info node for %s\n", basename);
+		return -1;
+	}
+	
+	node = plist_dict_get_item(info_node, "Path");
+	if (!node || plist_get_node_type(node) != PLIST_STRING) {
+		logger(LL_ERROR, "Unable to find Path node for %s\n", basename);
+		return -1;
+	}
+	plist_get_string_val(node, &value);
+	
+	logger(LL_INFO, "Downloading %s\n", value);
+	char* tmp_buf = NULL;
+	size_t tmp_len = 0;
+	if (fragmentzip_download_to_memory(fragment, value, &tmp_buf, &tmp_len, NULL)) {
+		logger(LL_ERROR, "Could not find %s\n", value);
+		free(value);
+		return -1;
+	}
+	if (!tmp_buf) {
+		logger(LL_ERROR, "Could not allocate %s buffer\n", value);
+		free(value);
+		return -1;
+	}
+	comp->data = (uint8_t*)tmp_buf;
+	comp->length = tmp_len;
+	logger(LL_DEBUG, "%s length: %zu\n", basename, comp->length);
+	free(value);
+	return 0;
+}
+
 int build_identity_get_component_digest(plist_t build_identity, const char* component, uint8_t** buffer, size_t *len)
 {
 	plist_t manifest_node = plist_dict_get_item(build_identity, "Manifest");
@@ -532,7 +669,11 @@ static int validate_fdr_firmware_component_hash(struct idevicerestore_client_t* 
 		rv = 1; // not used
 		goto end;
 	}
-	
+	if (!client->local_shsh) {
+		logger(LL_ERROR, "no local shsh\n");
+		rv = -1;
+		goto end;
+	}
 	tss_data = plist_copy(client->local_shsh);
 	if (!tss_data) {
 		logger(LL_ERROR, "local TSS data not found\n");
@@ -635,6 +776,11 @@ static int validate_memory_firmware_component_hash(struct idevicerestore_client_
 	
 	
 	if (verify_manifest) {
+		if (!tss) {
+			logger(LL_ERROR, "no TSS data\n");
+			rv = -1;
+			goto end;
+		}
 		tss_data = plist_copy(tss);
 		if (!tss_data) {
 			logger(LL_ERROR, "local TSS data not found\n");
@@ -708,6 +854,11 @@ static int validate_ipsw_firmware_component_hash(struct idevicerestore_client_t*
 	}
 	
 	if (verify_manifest) {
+		if (!client->local_shsh) {
+			logger(LL_ERROR, "no local shsh\n");
+			rv = -1;
+			goto end;
+		}
 		tss_data = plist_copy(client->local_shsh);
 		if (!tss_data) {
 			logger(LL_ERROR, "local TSS data not found\n");
@@ -806,6 +957,11 @@ int check_firmware_components(struct idevicerestore_client_t* client, plist_t bu
 		uint64_t im4m_data_len = 0;
 		uint8_t* hash = NULL;
 		size_t hash_len = 0;
+		
+		if (!client->local_shsh) {
+			logger(LL_ERROR, "no local shsh\n");
+			return -1;
+		}
 		plist_t tss_data = plist_copy(client->local_shsh);
 		if (!tss_data) {
 			logger(LL_ERROR, "local TSS data not found\n");
@@ -2002,7 +2158,7 @@ err:
 	return rv;
 }
 
-int validate_boot_nonce_hash(struct idevicerestore_client_t* client)
+int validate_boot_nonce_hash(struct idevicerestore_client_t* client, plist_t tss)
 {
 	int rv = -1;
 	if (!client) {
@@ -2019,9 +2175,14 @@ int validate_boot_nonce_hash(struct idevicerestore_client_t* client)
 	uint8_t* boot_nonce_hash = NULL;
 	size_t nonce_hash_size = 0;
 	
-	tss_data = plist_copy(client->local_shsh);
+	if (!tss) {
+		logger(LL_ERROR, "no TSS data\n");
+		rv = -1;
+		goto end;
+	}
+	tss_data = plist_copy(tss);
 	if (!tss_data) {
-		logger(LL_ERROR, "local TSS data not found\n");
+		logger(LL_ERROR, "TSS data not found\n");
 		rv = -2;
 		goto end;
 	}
@@ -2113,7 +2274,7 @@ err:
 	return rv;
 }
 
-int validate_ECID(struct idevicerestore_client_t* client)
+int validate_ECID(struct idevicerestore_client_t* client, plist_t tss)
 {
 	int rv = -1;
 	if (!client) {
@@ -2128,7 +2289,13 @@ int validate_ECID(struct idevicerestore_client_t* client)
 	char* im4m_data = NULL;
 	uint64_t im4m_data_len = 0;
 	uint64_t im4m_ecid = 0;
-	tss_data = plist_copy(client->local_shsh);
+	
+	if (!tss) {
+		logger(LL_ERROR, "no TSS data\n");
+		rv = -1;
+		goto end;
+	}
+	tss_data = plist_copy(tss);
 	if (!tss_data) {
 		logger(LL_ERROR, "local TSS data not found\n");
 		rv = -2;

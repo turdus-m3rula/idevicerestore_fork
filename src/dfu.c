@@ -163,11 +163,13 @@ int dfu_send_component(struct idevicerestore_client_t* client, plist_t build_ide
 
 #ifdef HAVE_TURDUS_MERULA
 		if (
-			!strcmp(component, "iBSS") && (client->build_major <= 13) && have_arm64_second_stage_iboot(client->cpid) &&
-			(client->alternative_ibss && (client->alternative_ibss_len != 0))
+			(strcmp(component, "iBSS") == 0) &&
+			(client->build_major <= 13) &&
+			have_arm64_second_stage_iboot(client->cpid) &&
+			(client->base.data && client->base.length)
 			)
 		{
-			component_size = client->alternative_ibss_len;
+			component_size = client->base.length;
 			component_data = malloc(component_size);
 			if (!component_data) {
 				logger(LL_ERROR, "malloc failed: %s\n", component);
@@ -176,7 +178,7 @@ int dfu_send_component(struct idevicerestore_client_t* client, plist_t build_ide
 			}
 			memset(component_data, 0, component_size);
 			logger(LL_INFO, "Copying alternative %s\n", component);
-			memcpy(component_data, client->alternative_ibss, component_size);
+			memcpy(component_data, client->base.data, component_size);
 		}
 		else {
 #endif
@@ -662,7 +664,15 @@ int dfu_enter_recovery(struct idevicerestore_client_t* client, plist_t build_ide
 #ifdef HAVE_TURDUS_MERULA
 		if ((client->flags & FLAG_DOWNGRADE) && is_arm64_soc(client->cpid)) {
 			logger(LL_INFO, "Checking boot-nonce hash\n");
-			int hashr = validate_boot_nonce_hash(client);
+			plist_t my_tss;
+			if ((client->flags & FLAG_TETHERED) || (client->flags & FLAG_BOOT_PONGO)) {
+				my_tss = client->base.tss;
+			}
+			else {
+				my_tss = client->local_shsh;
+			}
+			
+			int hashr = validate_boot_nonce_hash(client, my_tss);
 			if (hashr) {
 				mutex_unlock(&client->device_event_mutex);
 				logger(LL_ERROR, "boot-nonce hash validation failed (err = %d)\n", hashr);
@@ -672,7 +682,7 @@ int dfu_enter_recovery(struct idevicerestore_client_t* client, plist_t build_ide
 			}
 			
 			logger(LL_INFO, "Checking ECID\n");
-			int ecidr = validate_ECID(client);
+			int ecidr = validate_ECID(client, my_tss);
 			if (ecidr) {
 				mutex_unlock(&client->device_event_mutex);
 				logger(LL_ERROR, "ECID validation failed (err = %d)\n", ecidr);
