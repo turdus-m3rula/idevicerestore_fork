@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.68])
-AC_INIT([idevicerestore], [m4_esyscmd(./git-version-gen $RELEASE_VERSION)], [https://github.com/turdus-m3rula/idevicerestore_fork/issues], [], [https://sep.lol])
+AC_INIT([idevicerestore_fork], [m4_esyscmd(./git-version-gen $RELEASE_VERSION)], [https://github.com/turdus-m3rula/idevicerestore_fork/issues], [], [https://sep.lol])
 AM_INIT_AUTOMAKE([dist-bzip2 no-dist-gzip])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES])
 AC_CONFIG_SRCDIR([src/])
