@@ -3351,6 +3351,21 @@ void idevicerestore_client_free(struct idevicerestore_client_t* client)
 	if (client->sep_shellcode_block) {
 		free(client->sep_shellcode_block);
 	}
+	if (gPongoOS) {
+		free(gPongoOS);
+	}
+	if (gSEPRacer) {
+		free(gSEPRacer);
+	}
+	if (gKPF) {
+		free(gKPF);
+	}
+	if (gCPF) {
+		free(gCPF);
+	}
+	if (gRAMDisk) {
+		free(gRAMDisk);
+	}
 #endif
 	free(client->restore_variant);
 	free(client);
