@@ -2817,9 +2817,10 @@ logger(LL_DEBUG, "%s length: %zu\n", #name, client->t_##name.im4p.length); \
 #ifdef HAVE_TURDUS_MERULA
 		if ((client->flags & FLAG_DOWNGRADE) && is_arm64_soc(client->cpid)) {
 			if (
-				(client->flags & FLAG_TETHERED) ||
-				((client->flags & (FLAG_LOAD_BSEP_SHC | FLAG_FETCH_BSEP_PTE)) == (FLAG_LOAD_BSEP_SHC | FLAG_FETCH_BSEP_PTE))
-				)
+				is_a10_variant_soc(client->cpid) ||     // A10 variant
+				(client->flags & FLAG_LOAD_BSEP_SHC) || // do fwload race
+				(client->flags & FLAG_TETHERED)         // tethered
+				) // boot_tz0 race is possible even without a valid SEP image
 			{
 				{
 					// extract sep im4p
@@ -2879,7 +2880,6 @@ logger(LL_DEBUG, "%s length: %zu\n", #name, client->t_##name.im4p.length); \
 				}
 				
 				{
-					// boot_tz0 race is possible even without a valid SEP image
 					if (!client->rsep.data || !client->rsep.identity) {
 						logger(LL_ERROR, "Could not find information about RestoreSEP\n");
 						return -1;
@@ -2954,22 +2954,14 @@ logger(LL_DEBUG, "%s length: %zu\n", #name, client->t_##name.im4p.length); \
 		if ((client->flags & FLAG_DOWNGRADE) && is_arm64_soc(client->cpid)) {
 			plist_t my_tss = NULL;
 			// allocate image4 manifest
-			if (
-				(client->flags & FLAG_TETHERED) ||
-				((client->flags & (FLAG_LOAD_BSEP_SHC | FLAG_FETCH_BSEP_PTE)) == (FLAG_LOAD_BSEP_SHC | FLAG_FETCH_BSEP_PTE))
-				)
-			{
+			if ((client->flags & FLAG_TETHERED) || ((client->flags & FLAG_FETCH_BSEP) && (client->flags & FLAG_LOAD_BSEP_SHC))) {
 				if (!client->rsep.tss) {
 					logger(LL_ERROR, "no RestoreSEP shsh buffer\n");
 					return -1;
 				}
 				my_tss = client->rsep.tss;
 			}
-			else if (
-					 !((client->flags & FLAG_FETCH_BSEP_SHC) == FLAG_FETCH_BSEP_SHC) &&
-					 !((client->flags & FLAG_LOAD_BSEP_SHC | FLAG_FETCH_BSEP_PTE) == FLAG_FETCH_BSEP_PTE)
-					 )
-			{
+			else if (!(client->flags & FLAG_FETCH_BSEP)) {
 				// use cached blob
 				if (!client->local_shsh) {
 					logger(LL_ERROR, "no local shsh buffer\n");
@@ -3664,17 +3656,17 @@ int main(int argc, char* argv[])
 
 		case 'v':
 #ifdef HAVE_TURDUS_MERULA
-                printf("turdus_merula[%s] version: %s\n", PACKAGE_NAME, PACKAGE_VERSION);
-                printf("Library version\n");
-                printf("- %s: %s\n", "libirecovery", irecv_version());
-                printf("- %s: %s\n", "libtatsu", libtatsu_version());
-                printf("- %s: %s\n", "libusbmuxd", libusbmuxd_version());
-                printf("- %s: %s\n", "libplist", libplist_version());
-                printf("- %s: %s\n", "libimobiledevice_glue", libimobiledevice_glue_version());
-                printf("- %s: %s\n", "libimobiledevice", libimobiledevice_version());
-                printf("- %s: %s\n", "libfragmentzip", fragmentzip_version());
-                printf("- %s: %s\n", "libzip", zip_libzip_version());
-                printf("- %s: %s\n", "libcurl", curl_version());
+				printf("turdus_merula[%s] version: %s\n", PACKAGE_NAME, PACKAGE_VERSION);
+				printf("Library version\n");
+				printf("- %s: %s\n", "libirecovery", irecv_version());
+				printf("- %s: %s\n", "libtatsu", libtatsu_version());
+				printf("- %s: %s\n", "libusbmuxd", libusbmuxd_version());
+				printf("- %s: %s\n", "libplist", libplist_version());
+				printf("- %s: %s\n", "libimobiledevice_glue", libimobiledevice_glue_version());
+				printf("- %s: %s\n", "libimobiledevice", libimobiledevice_version());
+				printf("- %s: %s\n", "libfragmentzip", fragmentzip_version());
+				printf("- %s: %s\n", "libzip", zip_libzip_version());
+				printf("- %s: %s\n", "libcurl", curl_version());
 #else
 			printf("%s %s (libirecovery %s, libtatsu %s)\n", PACKAGE_NAME, PACKAGE_VERSION, irecv_version(), libtatsu_version());
 #endif
