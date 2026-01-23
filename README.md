@@ -1,5 +1,8 @@
 # idevicerestore
 
+> [!NOTE]
+> Note: This is a fork of idevicerestore.  
+
 *A command-line application to restore firmware files to iOS devices.*
 
 ![](https://github.com/libimobiledevice/idevicerestore/actions/workflows/build.yml/badge.svg)
@@ -56,6 +59,16 @@ You need to have a working compiler (gcc/clang) and development environent
 available. This project uses autotools for the build process, allowing to
 have common build steps across different platforms.
 Only the prerequisites differ and they are described in this section.
+
+#### Preparation for building turdus merula
+If you want to enable turdus merula and build, you will need resources. For more information, please see [sep.lol](https://sep.lol).
+Then put `resource.tar.zst` to `src/stuff/resource.tar.zst` and run this:
+```shell
+cd src/stuff/
+zstd -d resource.tar.zst
+tar -xvf resource.tar
+./gen.sh
+```
 
 #### Linux (Debian/Ubuntu based)
 
@@ -123,8 +136,10 @@ Only the prerequisites differ and they are described in this section.
   * [libimobiledevice-glue](https://github.com/libimobiledevice/libimobiledevice-glue)
   * [libusbmuxd](https://github.com/libimobiledevice/libusbmuxd)
   * [libimobiledevice](https://github.com/libimobiledevice/libimobiledevice)
-  * [libirecovery](https://github.com/libimobiledevice/libirecovery)
+  * [libirecovery](https://github.com/turdus-m3rula/libirecovery)
   * [libtatsu](https://github.com/libimobiledevice/libtatsu)
+  If you want to enable turdus merula, you also need the following dependency:
+  * [libfragmentzip](https://github.com/turdus-m3rula/libfragmentzip)
 
   Check their `README.md` for building and installation instructions.
 
@@ -205,6 +220,8 @@ or
 ```shell
 ./configure --prefix=/usr/local
 ```
+
+If you want to enable turdus merula, please add `--with-turdusmerula` to autogen args.
 
 Once the command is successful, the last few lines of output will look like this:
 ```
