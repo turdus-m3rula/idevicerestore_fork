@@ -2422,7 +2422,12 @@ logger(LL_DEBUG, "%s length: %zu\n", #name, client->t_##name.im4p.length); \
 		}
 	}
 
-	if (needs_os_extraction && !(client->flags & FLAG_SHSHONLY)) {
+	if (
+		needs_os_extraction && !(client->flags & FLAG_SHSHONLY)
+#ifdef HAVE_TURDUS_MERULA
+		&& !(client->flags & FLAG_FETCH_BSEP)
+#endif
+		) {
 		char* tmpf = NULL;
 		struct stat st;
 		if (client->cache_dir) {
