@@ -665,7 +665,7 @@ int dfu_enter_recovery(struct idevicerestore_client_t* client, plist_t build_ide
 		if ((client->flags & FLAG_DOWNGRADE) && is_arm64_soc(client->cpid)) {
 			logger(LL_INFO, "Checking boot-nonce hash\n");
 			plist_t my_tss;
-			if ((client->flags & FLAG_TETHERED) || (client->flags & FLAG_BOOT_PONGO)) {
+			if ((client->flags & FLAG_TETHERED) || (client->flags & FLAG_FETCH_BSEP_SHC)) {
 				my_tss = client->base.tss;
 			}
 			else {

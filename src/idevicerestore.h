@@ -49,9 +49,18 @@ extern "C" {
 #define FLAG_KEEP_PERS       (1 << 13)
 #ifdef HAVE_TURDUS_MERULA
 #define FLAG_DOWNGRADE       (1 << 20)
-#define FLAG_BOOT_PONGO      (1 << 21)
-#define FLAG_TETHERED        (1 << 22)
-#define FLAG_ALLOW_UNSUPPORTED (1 << 23)
+#define FLAG_TETHERED        (1 << 21)
+#define FLAG_FETCH_BSEP_SHC  (1 << 22)
+#define FLAG_FETCH_BSEP_PTE  (1 << 23)
+#define FLAG_LOAD_BSEP_SHC   (1 << 24)
+#define FLAG_LOAD_BSEP_PTE   (1 << 25)
+
+#define FLAG_CHECK_A8        (FLAG_FETCH_BSEP_SHC | FLAG_FETCH_BSEP_PTE | FLAG_LOAD_BSEP_SHC | FLAG_LOAD_BSEP_PTE)
+#define FLAG_CHECK_A9        (FLAG_FETCH_BSEP_SHC | FLAG_LOAD_BSEP_SHC | FLAG_LOAD_BSEP_PTE)
+#define FLAG_FETCH_BSEP      (FLAG_FETCH_BSEP_SHC | FLAG_FETCH_BSEP_PTE)
+#define FLAG_LOAD_BSEP       (FLAG_FETCH_BSEP_SHC | FLAG_FETCH_BSEP_PTE)
+
+#define FLAG_ALLOW_UNSUPPORTED (1 << 29)
 #endif
 #define FLAG_IN_PROGRESS     (1 << 30)
 

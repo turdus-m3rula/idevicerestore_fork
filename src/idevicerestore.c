@@ -666,61 +666,50 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 		
 		// check device
 		if (is_a10_variant_soc(client->cpid)) {
-			if (client->sep_boot_tz0_race) {
-				logger(LL_ERROR, "boot_tz0 race is not supported in this SoC\n");
+			if (client->flags & (FLAG_FETCH_BSEP | FLAG_LOAD_BSEP)) {
+				logger(LL_ERROR, "bsep is not supported in this SoC\n");
 				return -2;
 			}
-			client->sep_fwload_race = 1;
 		}
 		else if (is_a9_variant_soc(client->cpid)) {
-			if (client->sep_fwload_race && client->sep_boot_tz0_race) {
+			if ((client->flags & FLAG_LOAD_BSEP_SHC) && (client->flags & FLAG_LOAD_BSEP_PTE)) {
 				logger(LL_ERROR, "Conflict detected\n");
 				return -2;
 			}
-			if (!(client->flags & FLAG_BOOT_PONGO)) {
-				if (!client->sep_fwload_race && !client->sep_boot_tz0_race) {
-					logger(LL_ERROR, "No exploit method selected\n");
-					return -2;
-				}
+			if ((client->flags & FLAG_FETCH_BSEP_SHC) && (client->flags & FLAG_FETCH_BSEP_PTE)) {
+				logger(LL_ERROR, "Conflict detected\n");
+				return -2;
 			}
-			if (client->flags & FLAG_BOOT_PONGO) {
-				if (client->sep_boot_tz0_race) {
-					logger(LL_ERROR, "boot_tz0 race is not supported in pongoOS boot mode.\n");
-					return -2;
-				}
-				if (client->sep_fwload_race) {
-					if (!client->get_pte_block) {
-						logger(LL_ERROR, "get_pte_block flag not found\n");
-						return -2;
-					}
-				}
+			if ((client->flags & FLAG_FETCH_BSEP_PTE) && (client->flags & FLAG_LOAD_BSEP_PTE)) {
+				logger(LL_ERROR, "Conflict detected\n");
+				return -2;
+			}
+			if (!(client->flags & FLAG_CHECK_A9)) {
+				logger(LL_ERROR, "No exploit method selected\n");
+				return -2;
 			}
 		}
 		else if (is_a8_variant_soc(client->cpid)) {
-			if (client->sep_fwload_race) {
-				logger(LL_DEBUG, "fwload race is not supported for this device for now.\n");
+			if ((client->flags & FLAG_LOAD_BSEP_SHC) && (client->flags & FLAG_LOAD_BSEP_PTE)) {
+				logger(LL_ERROR, "Conflict detected\n");
 				return -2;
 			}
-			if (!(client->flags & FLAG_BOOT_PONGO)) {
-				if (!client->sep_boot_tz0_race) {
-					logger(LL_ERROR, "No exploit method selected\n");
-					return -2;
-				}
+			if ((client->flags & FLAG_FETCH_BSEP_SHC) && (client->flags & FLAG_FETCH_BSEP_PTE)) {
+				logger(LL_ERROR, "Conflict detected\n");
+				return -2;
 			}
-			if (client->flags & FLAG_BOOT_PONGO) {
-				if (client->sep_boot_tz0_race) {
-					logger(LL_ERROR, "boot_tz0 race is not supported in pongoOS boot mode.\n");
-					return -2;
-				}
+			if ((client->flags & FLAG_FETCH_BSEP_PTE) && (client->flags & FLAG_LOAD_BSEP_PTE)) {
+				logger(LL_ERROR, "Conflict detected\n");
+				return -2;
+			}
+			if (!(client->flags & FLAG_CHECK_A8)) {
+				logger(LL_ERROR, "No exploit method selected\n");
+				return -2;
 			}
 		}
 		else if (is_armv7s_soc(client->cpid)) {
-			if (client->sep_boot_tz0_race || client->sep_fwload_race) {
-				logger(LL_ERROR, "This device does not have the SEP.\n");
-				return -2;
-			}
-			if (client->flags & FLAG_BOOT_PONGO) {
-				logger(LL_ERROR, "This device does not support pongoOS.\n");
+			if (client->flags & (FLAG_FETCH_BSEP | FLAG_LOAD_BSEP)) {
+				logger(LL_ERROR, "This device does not support SEP/PongoOS.\n");
 				return -2;
 			}
 		}
@@ -731,7 +720,11 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 		
 		// check shsh
 		// some modes require fetching from the server, so don't check them yet
-		if (!(client->flags & FLAG_TETHERED) && !(client->flags & FLAG_BOOT_PONGO)) {
+		if (
+			!(client->flags & FLAG_TETHERED) && // !tethered
+			!(client->flags & FLAG_FETCH_BSEP)  // !pongoonly
+			)
+		{
 			if (!client->use_custom_ticket || !ap_shsh_path) {
 				logger(LL_ERROR, "local shsh not selected\n");
 				return -2;
@@ -1179,296 +1172,294 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 #define RDSK_TYPE_UNION_TVOS    (1u << 1)
 #define RDSK_TYPE_DYLDHOOK_IOS  (1u << 2)
 #define RDSK_TYPE_DYLDHOOK_TVOS (1u << 3)
-	uint32_t rdsk_type = RDSK_TYPE_NONE;
-	{
-		int is_tvos = is_tvos_with_cpid_bdid(client->cpid, client->bdid);
-		if (client->build_major >= 14) {
-			if (client->build_major == 14 || client->build_major == 15) {
-				if (is_tvos == 0) { // iPhoneOS
-					rdsk_type |= RDSK_TYPE_UNION_IOS;
+	if (client->flags & FLAG_DOWNGRADE) {
+		if (is_arm64_soc(client->cpid)) {
+			uint32_t rdsk_type = RDSK_TYPE_NONE;
+			{
+				int is_tvos = is_tvos_with_cpid_bdid(client->cpid, client->bdid);
+				if (client->build_major >= 14) {
+					if (client->build_major == 14 || client->build_major == 15) {
+						if (is_tvos == 0) { // iPhoneOS
+							rdsk_type |= RDSK_TYPE_UNION_IOS;
+						}
+						if (is_tvos == 1) { // tvOS
+							rdsk_type |= RDSK_TYPE_UNION_TVOS;
+						}
+					}
+					else {
+						if (is_tvos == 0) { // iPhoneOS
+							rdsk_type |= RDSK_TYPE_DYLDHOOK_IOS;
+						}
+						if (is_tvos == 1) { // tvOS
+							rdsk_type |= RDSK_TYPE_DYLDHOOK_TVOS;
+						}
+					}
 				}
-				if (is_tvos == 1) { // tvOS
-					rdsk_type |= RDSK_TYPE_UNION_TVOS;
+			}
+			logger(LL_INFO, "RAMDisk type: 0x%04x\n", rdsk_type);
+			
+			// load RAMDisk
+			if (rdsk_type != 0) {
+				if (gRAMDisk == NULL) {
+					logger(LL_INFO, "Loading overlay ramdisk...\n");
+					unsigned int ramdisk_length = 0;
+					void* ramdisk_buffer = NULL;
+					if (rdsk_type & RDSK_TYPE_UNION_IOS) {
+						ramdisk_buffer = union_iphoneos_bin;
+						ramdisk_length = union_iphoneos_bin_len;
+					}
+					else if (rdsk_type & RDSK_TYPE_UNION_TVOS) {
+						ramdisk_buffer = union_tvos_bin;
+						ramdisk_length = union_tvos_bin_len;
+					}
+					else if (rdsk_type & RDSK_TYPE_DYLDHOOK_IOS) {
+						ramdisk_buffer = overlay_iphoneos_bin;
+						ramdisk_length = overlay_iphoneos_bin_len;
+					}
+					else if (rdsk_type & RDSK_TYPE_DYLDHOOK_TVOS) {
+						ramdisk_buffer = overlay_tvos_bin;
+						ramdisk_length = overlay_tvos_bin_len;
+					}
+					else {
+						logger(LL_ERROR, "Invalid rdsk_type\n");
+						return -1;
+					}
+					void* tmp_buffer = NULL;
+					int res = posix_memalign(&tmp_buffer, sizeof(uint64_t), ramdisk_length);
+					if (res != 0) {
+						logger(LL_ERROR, "memalign failed (reason: %s)", strerror(res));
+						return -1;
+					}
+					if (tmp_buffer == NULL) {
+						logger(LL_ERROR, "Out of memory\n");
+						return -1;
+					}
+					memcpy(tmp_buffer, ramdisk_buffer, ramdisk_length);
+					gRAMDisk = tmp_buffer;
+					gRAMDiskLength = ramdisk_length;
+					logger(LL_INFO, "Loaded embedded overlay ramdisk, length %zu\n", gRAMDiskLength);
 				}
 			}
-			else {
-				if (is_tvos == 0) { // iPhoneOS
-					rdsk_type |= RDSK_TYPE_DYLDHOOK_IOS;
+			
+			// load module and pongo
+			if (gPongoOS == NULL) {
+				logger(LL_INFO, "Loading Pongo...\n");
+				void* tmp_buffer = NULL;
+				int res = posix_memalign(&tmp_buffer, sizeof(uint64_t), Pongo_bin_len);
+				if (res != 0) {
+					logger(LL_ERROR, "memalign failed (reason: %s)", strerror(res));
+					return -1;
 				}
-				if (is_tvos == 1) { // tvOS
-					rdsk_type |= RDSK_TYPE_DYLDHOOK_TVOS;
+				if (tmp_buffer == NULL) {
+					logger(LL_ERROR, "Out of memory\n");
+					return -1;
+				}
+				memcpy(tmp_buffer, Pongo_bin, Pongo_bin_len);
+				gPongoOS = tmp_buffer;
+				gPongoOSLength = Pongo_bin_len;
+				logger(LL_INFO, "Loaded embedded Pongo, length %zu\n", gPongoOSLength);
+			}
+			if (gSEPRacer == NULL) {
+				logger(LL_INFO, "Loading sep_racer...\n");
+				void* tmp_buffer = NULL;
+				int res = posix_memalign(&tmp_buffer, sizeof(uint64_t), sep_racer_bin_len);
+				if (res != 0) {
+					logger(LL_ERROR, "memalign failed (reason: %s)", strerror(res));
+					return -1;
+				}
+				if (tmp_buffer == NULL) {
+					logger(LL_ERROR, "Out of memory\n");
+					return -1;
+				}
+				memcpy(tmp_buffer, sep_racer_bin, sep_racer_bin_len);
+				gSEPRacer = tmp_buffer;
+				gSEPRacerLength = sep_racer_bin_len;
+				logger(LL_INFO, "Loaded embedded sep_racer module, length %zu\n", gSEPRacerLength);
+			}
+			if (gKPF == NULL) {
+				logger(LL_INFO, "Loading kpf...\n");
+				void* tmp_buffer = NULL;
+				int res = posix_memalign(&tmp_buffer, sizeof(uint64_t), kpf_bin_len);
+				if (res != 0) {
+					logger(LL_ERROR, "memalign failed (reason: %s)", strerror(res));
+					return -1;
+				}
+				if (tmp_buffer == NULL) {
+					logger(LL_ERROR, "Out of memory\n");
+					return -1;
+				}
+				memcpy(tmp_buffer, kpf_bin, kpf_bin_len);
+				gKPF = tmp_buffer;
+				gKPFLength = kpf_bin_len;
+				logger(LL_INFO, "Loaded embedded kpf module, length %zu\n", gKPFLength);
+			}
+			if (gCPF == NULL) {
+				logger(LL_INFO, "Loading cpf...\n");
+				void* tmp_buffer = NULL;
+				int res = posix_memalign(&tmp_buffer, sizeof(uint64_t), cpf_bin_len);
+				if (res != 0) {
+					logger(LL_ERROR, "memalign failed (reason: %s)", strerror(res));
+					return -1;
+				}
+				if (tmp_buffer == NULL) {
+					logger(LL_ERROR, "Out of memory\n");
+					return -1;
+				}
+				memcpy(tmp_buffer, cpf_bin, cpf_bin_len);
+				gCPF = tmp_buffer;
+				gCPFLength = cpf_bin_len;
+				logger(LL_INFO, "Loaded embedded cpf module, length %zu\n", gCPFLength);
+			}
+			
+			// check pongo
+			{
+				logger(LL_INFO, "Checking Pongo image...\n");
+				int found = 0;
+				const uint64_t magicval = PONGO_MAGIC_VALUE; // 0x1337cafebabe4100uLL
+				uint8_t* cur = gPongoOS;
+				const uint8_t* end = (uint8_t*)(cur + gPongoOSLength - sizeof(uint64_t));
+				while (cur <= end) {
+					if (read_u64_le(cur) == magicval) {
+						found = 1;
+						break;
+					}
+					cur += sizeof(uint64_t);
+				}
+				if (found == 0) {
+					logger(LL_ERROR, "Incompatible Pongo image\n");
+					return -1;
 				}
 			}
-		}
-	}
-	logger(LL_INFO, "RAMDisk type: 0x%04x\n", rdsk_type);
-	
-	// load RAMDisk
-	if (rdsk_type != 0) {
-		if (gRAMDisk == NULL) {
-			logger(LL_INFO, "Loading overlay ramdisk...\n");
-			unsigned int ramdisk_length = 0;
-			void* ramdisk_buffer = NULL;
-			if (rdsk_type & RDSK_TYPE_UNION_IOS) {
-				ramdisk_buffer = union_iphoneos_bin;
-				ramdisk_length = union_iphoneos_bin_len;
+			
+			// check module flags
+			uint64_t kpf_flag = 0;
+			uint64_t cpf_flag = 0;
+			uint64_t sep_racer_flag = 0;
+			uint64_t ramdisk_flag = 0;
+			
+			logger(LL_INFO, "Loading image flags...\n");
+			
+			if (
+				load_rdsk_flag(
+							   (const uint8_t*)gRAMDisk,
+							   gRAMDiskLength,
+							   (rdsk_type & (RDSK_TYPE_UNION_IOS | RDSK_TYPE_UNION_TVOS)) ? 0x2222 : 0x1111,
+							   "RAMDisk.dmg",
+							   &ramdisk_flag
+							   )
+				)
+			{
+				logger(LL_ERROR, "Image flag not found: %s\n", "RAMDisk.dmg");
+				return -2;
 			}
-			else if (rdsk_type & RDSK_TYPE_UNION_TVOS) {
-				ramdisk_buffer = union_tvos_bin;
-				ramdisk_length = union_tvos_bin_len;
+			if (load_module_flag((const uint8_t*)gCPF, gCPFLength, 0xAAAA000000009990uLL, "cpf", &cpf_flag)) {
+				logger(LL_ERROR, "Image flag not found: %s\n", "cpf");
+				return -2;
 			}
-			else if (rdsk_type & RDSK_TYPE_DYLDHOOK_IOS) {
-				ramdisk_buffer = overlay_iphoneos_bin;
-				ramdisk_length = overlay_iphoneos_bin_len;
+			if (load_module_flag((const uint8_t*)gKPF, gKPFLength, 0xBBBB000000009990uLL, "kpf", &kpf_flag)) {
+				logger(LL_ERROR, "Image flag not found: %s\n", "kpf");
+				return -2;
 			}
-			else if (rdsk_type & RDSK_TYPE_DYLDHOOK_TVOS) {
-				ramdisk_buffer = overlay_tvos_bin;
-				ramdisk_length = overlay_tvos_bin_len;
+			if (load_module_flag((const uint8_t*)gSEPRacer, gSEPRacerLength, 0xCCCC000000009990uLL, "sep_racer", &sep_racer_flag)) {
+				logger(LL_ERROR, "Image flag not found: %s\n", "sep_racer");
+				return -2;
 			}
-			else {
-				logger(LL_ERROR, "Invalid rdsk_type\n");
-				return -1;
-			}
-			void* tmp_buffer = NULL;
-			int res = posix_memalign(&tmp_buffer, sizeof(uint64_t), ramdisk_length);
-			if (res != 0) {
-				logger(LL_ERROR, "memalign failed (reason: %s)", strerror(res));
-				return -1;
-			}
-			if (tmp_buffer == NULL) {
-				logger(LL_ERROR, "Out of memory\n");
-				return -1;
-			}
-			memcpy(tmp_buffer, ramdisk_buffer, ramdisk_length);
-			gRAMDisk = tmp_buffer;
-			gRAMDiskLength = ramdisk_length;
-			logger(LL_INFO, "Loaded embedded overlay ramdisk, length %zu\n", gRAMDiskLength);
-		}
-	}
-	
-	// load module and pongo
-	if (gPongoOS == NULL) {
-		logger(LL_INFO, "Loading Pongo...\n");
-		void* tmp_buffer = NULL;
-		int res = posix_memalign(&tmp_buffer, sizeof(uint64_t), Pongo_bin_len);
-		if (res != 0) {
-			logger(LL_ERROR, "memalign failed (reason: %s)", strerror(res));
-			return -1;
-		}
-		if (tmp_buffer == NULL) {
-			logger(LL_ERROR, "Out of memory\n");
-			return -1;
-		}
-		memcpy(tmp_buffer, Pongo_bin, Pongo_bin_len);
-		gPongoOS = tmp_buffer;
-		gPongoOSLength = Pongo_bin_len;
-		logger(LL_INFO, "Loaded embedded Pongo, length %zu\n", gPongoOSLength);
-	}
-	if (gSEPRacer == NULL) {
-		logger(LL_INFO, "Loading sep_racer...\n");
-		void* tmp_buffer = NULL;
-		int res = posix_memalign(&tmp_buffer, sizeof(uint64_t), sep_racer_bin_len);
-		if (res != 0) {
-			logger(LL_ERROR, "memalign failed (reason: %s)", strerror(res));
-			return -1;
-		}
-		if (tmp_buffer == NULL) {
-			logger(LL_ERROR, "Out of memory\n");
-			return -1;
-		}
-		memcpy(tmp_buffer, sep_racer_bin, sep_racer_bin_len);
-		gSEPRacer = tmp_buffer;
-		gSEPRacerLength = sep_racer_bin_len;
-		logger(LL_INFO, "Loaded embedded sep_racer module, length %zu\n", gSEPRacerLength);
-	}
-	if (gKPF == NULL) {
-		logger(LL_INFO, "Loading kpf...\n");
-		void* tmp_buffer = NULL;
-		int res = posix_memalign(&tmp_buffer, sizeof(uint64_t), kpf_bin_len);
-		if (res != 0) {
-			logger(LL_ERROR, "memalign failed (reason: %s)", strerror(res));
-			return -1;
-		}
-		if (tmp_buffer == NULL) {
-			logger(LL_ERROR, "Out of memory\n");
-			return -1;
-		}
-		memcpy(tmp_buffer, kpf_bin, kpf_bin_len);
-		gKPF = tmp_buffer;
-		gKPFLength = kpf_bin_len;
-		logger(LL_INFO, "Loaded embedded kpf module, length %zu\n", gKPFLength);
-	}
-	if (gCPF == NULL) {
-		logger(LL_INFO, "Loading cpf...\n");
-		void* tmp_buffer = NULL;
-		int res = posix_memalign(&tmp_buffer, sizeof(uint64_t), cpf_bin_len);
-		if (res != 0) {
-			logger(LL_ERROR, "memalign failed (reason: %s)", strerror(res));
-			return -1;
-		}
-		if (tmp_buffer == NULL) {
-			logger(LL_ERROR, "Out of memory\n");
-			return -1;
-		}
-		memcpy(tmp_buffer, cpf_bin, cpf_bin_len);
-		gCPF = tmp_buffer;
-		gCPFLength = cpf_bin_len;
-		logger(LL_INFO, "Loaded embedded cpf module, length %zu\n", gCPFLength);
-	}
-	
-	// check pongo
-	{
-		logger(LL_INFO, "Checking Pongo image...\n");
-		int found = 0;
-		const uint64_t magicval = PONGO_MAGIC_VALUE; // 0x1337cafebabe4100uLL
-		uint8_t* cur = gPongoOS;
-		const uint8_t* end = (uint8_t*)(cur + gPongoOSLength - sizeof(uint64_t));
-		while (cur <= end) {
-			if (read_u64_le(cur) == magicval) {
-				found = 1;
-				break;
-			}
-			cur += sizeof(uint64_t);
-		}
-		if (found == 0) {
-			logger(LL_ERROR, "Incompatible Pongo image\n");
-			return -1;
-		}
-	}
-	
-	// check module flags
-	if (is_arm64_soc(client->cpid)) {
-		uint64_t kpf_flag = 0;
-		uint64_t cpf_flag = 0;
-		uint64_t sep_racer_flag = 0;
-		uint64_t ramdisk_flag = 0;
-		
-		logger(LL_INFO, "Loading image flags...\n");
-		
-		if (
-			load_rdsk_flag(
-						   (const uint8_t*)gRAMDisk,
-						   gRAMDiskLength,
-						   (rdsk_type & (RDSK_TYPE_UNION_IOS | RDSK_TYPE_UNION_TVOS)) ? 0x2222 : 0x1111,
-						   "RAMDisk.dmg",
-						   &ramdisk_flag
-						   )
-			)
-		{
-			return -2;
-		}
-		if (load_module_flag((const uint8_t*)gCPF, gCPFLength, 0xAAAA000000009990uLL, "cpf", &cpf_flag)) {
-			return -2;
-		}
-		if (load_module_flag((const uint8_t*)gKPF, gKPFLength, 0xBBBB000000009990uLL, "kpf", &kpf_flag)) {
-			return -2;
-		}
-		if (load_module_flag((const uint8_t*)gSEPRacer, gSEPRacerLength, 0xCCCC000000009990uLL, "sep_racer", &sep_racer_flag)) {
-			return -2;
-		}
-		client->kpf_flag = kpf_flag;
-		client->cpf_flag = cpf_flag;
-		client->sep_racer_flag = sep_racer_flag;
-		client->ramdisk_flag = ramdisk_flag;
-		
-		// check module compatibility
-		logger(LL_INFO, "Checking image flags...\n");
-		int module_unsupported = 0;
-		uint64_t vflag = convert_cpid_bdid_to_plat_vflag(client->cpid, client->bdid);
-		int is_tvos = is_tvos_with_cpid_bdid(client->cpid, client->bdid);
-		if (is_tvos == -1) {
-			logger(LL_ERROR, "Unknown bdid (BDID: 0x%02x)\n", (uint8_t)client->bdid);
-			module_unsupported = 1;
-		}
-		if (0 == check_vflag(client->ramdisk_flag, vflag)) {
-			logger(LL_DEBUG, "Found unsupported module (name: %s)\n", "RAMDisk.dmg");
-			module_unsupported = 1;
-		}
-		if (!is_a8_variant_soc(client->cpid)) {
-			if (0 == check_vflag(client->cpf_flag, vflag)) {
-				logger(LL_DEBUG, "Found unsupported module (name: %s)\n", "cpf");
+			client->kpf_flag = kpf_flag;
+			client->cpf_flag = cpf_flag;
+			client->sep_racer_flag = sep_racer_flag;
+			client->ramdisk_flag = ramdisk_flag;
+			
+			// check module compatibility
+			logger(LL_INFO, "Checking image flags...\n");
+			int module_unsupported = 0;
+			uint64_t vflag = convert_cpid_bdid_to_plat_vflag(client->cpid, client->bdid);
+			int is_tvos = is_tvos_with_cpid_bdid(client->cpid, client->bdid);
+			if (is_tvos == -1) {
+				logger(LL_ERROR, "Unknown bdid (BDID: 0x%02x)\n", (uint8_t)client->bdid);
 				module_unsupported = 1;
 			}
-		}
-		if (0 == check_vflag(client->kpf_flag, vflag)) {
-			logger(LL_DEBUG, "Found unsupported module (name: %s)\n", "kpf");
-			module_unsupported = 1;
-		}
-		if (0 == check_vflag(client->sep_racer_flag, vflag)) {
-			logger(LL_DEBUG, "Found unsupported module (name: %s)\n", "sep_racer");
-			module_unsupported = 1;
-		}
-		
-		if (module_unsupported) {
-			logger(LL_ERROR, "Unsupported device (CPID: %04x)\n", client->cpid);
-			return -2;
-		}
-		
-		// check bsep
-		if (client->get_shc_block || client->get_pte_block) {
-			if (is_a10_variant_soc(client->cpid)) {
-				logger(LL_ERROR, "This device does not requires SEP ciphertext block\n");
+			if (0 == check_vflag(client->ramdisk_flag, vflag)) {
+				logger(LL_ERROR, "Found unsupported module (name: %s)\n", "RAMDisk.dmg");
+				module_unsupported = 1;
+			}
+			if (!is_a8_variant_soc(client->cpid)) {
+				if (0 == check_vflag(client->cpf_flag, vflag)) {
+					logger(LL_ERROR, "Found unsupported module (name: %s)\n", "cpf");
+					module_unsupported = 1;
+				}
+			}
+			if (0 == check_vflag(client->kpf_flag, vflag)) {
+				logger(LL_ERROR, "Found unsupported module (name: %s)\n", "kpf");
+				module_unsupported = 1;
+			}
+			if (0 == check_vflag(client->sep_racer_flag, vflag)) {
+				logger(LL_ERROR, "Found unsupported module (name: %s)\n", "sep_racer");
+				module_unsupported = 1;
+			}
+			
+			if (module_unsupported) {
+				logger(LL_ERROR, "Unsupported device (CPID: %04x)\n", client->cpid);
 				return -2;
 			}
-			if (client->get_shc_block && client->get_pte_block) {
-				logger(LL_ERROR, "Conflict detected\n");
-				return -2;
-			}
-		}
-		if (client->sep_shellcode_block && client->sep_shellcode_block_len) {
-			if (client->sep_shellcode_block_len == 0x80) {
-				logger(LL_INFO, "Found old style block!\n");
-				uint8_t zero[0x10] = { 0 };
-				memset(zero, 0, 0x10);
-				if (memcmp(client->sep_shellcode_block + 0x30, zero, 0x10) || memcmp(client->sep_shellcode_block + 0x70, zero, 0x10)) {
-					logger(LL_ERROR, "block type check failed!\n");
+			
+			// check bsep
+			if (client->flags & FLAG_FETCH_BSEP) {
+				if (is_a10_variant_soc(client->cpid)) {
+					logger(LL_ERROR, "This device does not requires SEP ciphertext block\n");
 					return -2;
 				}
 			}
-			else {
-				logger(LL_INFO, "Checking block type...\n");
-				bool _bsep_is_valid = 0;
-				sep_block_t* bsep = (sep_block_t*)client->sep_shellcode_block;
-				uint32_t myType = 0;
-				if (get_bsep_type(bsep, &myType) == false) {
-					logger(LL_ERROR, "block type check failed!\n");
-					return -2;
-				}
-				if (myType == BSEP_TYPE_SHC) {
-					if (client->sep_fwload_race) {
-						_bsep_is_valid = 1;
+			if (client->sep_shellcode_block && client->sep_shellcode_block_len) {
+				if (client->sep_shellcode_block_len == 0x80) {
+					logger(LL_INFO, "Found old style block!\n");
+					uint8_t zero[0x10] = { 0 };
+					memset(zero, 0, 0x10);
+					if (memcmp(client->sep_shellcode_block + 0x30, zero, 0x10) || memcmp(client->sep_shellcode_block + 0x70, zero, 0x10)) {
+						logger(LL_ERROR, "block type check failed!\n");
+						return -2;
 					}
 				}
-				if (myType == BSEP_TYPE_PTE) {
-					if (client->sep_boot_tz0_race) {
+				else {
+					logger(LL_INFO, "Checking block type...\n");
+					bool _bsep_is_valid = 0;
+					sep_block_t* bsep = (sep_block_t*)client->sep_shellcode_block;
+					uint32_t myType = 0;
+					if (get_bsep_type(bsep, &myType) == false) {
+						logger(LL_ERROR, "block type check failed!\n");
+						return -2;
+					}
+					if ((myType == BSEP_TYPE_SHC) && (client->flags & FLAG_LOAD_BSEP_SHC)) {
 						_bsep_is_valid = 1;
 					}
+					if ((myType == BSEP_TYPE_PTE) && (client->flags & FLAG_LOAD_BSEP_PTE)) {
+						_bsep_is_valid = 1;
+					}
+					if (!_bsep_is_valid) {
+						logger(LL_ERROR, "Invalid block type!\n");
+						return -2;
+					}
 				}
-				if (!_bsep_is_valid) {
-					logger(LL_ERROR, "Invalid block type!\n");
-					return -2;
+			}
+			
+			if (client->flags & FLAG_TETHERED) {
+				logger(LL_INFO, "Checking image version flags...\n");
+				int is_tvos = is_tvos_with_cpid_bdid(client->cpid, client->bdid);
+				uint64_t vflag = convert_build_to_ios_vflag(client->build_major);
+				if (client->build_major >= 14) {
+					if (0 == check_vflag(client->kpf_flag, vflag)) {
+						logger(LL_ERROR, "Found unsupported module (name: %s)\n", "kpf");
+						return -1;
+					}
+					if (0 == check_vflag(client->ramdisk_flag, vflag)) {
+						logger(LL_ERROR, "Found unsupported module (name: %s)\n", "RAMDisk.dmg");
+						return -1;
+					}
 				}
 			}
 		}
 		
-		if (client->flags & FLAG_TETHERED) {
-			logger(LL_INFO, "Checking image version flags...\n");
-			int is_tvos = is_tvos_with_cpid_bdid(client->cpid, client->bdid);
-			uint64_t vflag = convert_build_to_ios_vflag(client->build_major);
-			if (client->build_major >= 14) {
-				if (0 == check_vflag(client->kpf_flag, vflag)) {
-					logger(LL_ERROR, "Found unsupported module (name: %s)\n", "kpf");
-					return -1;
-				}
-				if (0 == check_vflag(client->ramdisk_flag, vflag)) {
-					logger(LL_ERROR, "Found unsupported module (name: %s)\n", "RAMDisk.dmg");
-					return -1;
-				}
-			}
-		}
+		logger(LL_DEBUG, "Found supported device (CPID: %04x)\n", client->cpid);
 	}
-	
-	logger(LL_DEBUG, "Found supported device (CPID: %04x)\n", client->cpid);
 #endif
 
 	client->image4supported = is_image4_supported(client);
@@ -1662,7 +1653,11 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 	uint32_t specific_fw_component_flag = 0;
 	if (client->flags & FLAG_DOWNGRADE) {
 		// check cryptex1 ticket
-		if (!(client->flags & FLAG_TETHERED) && !(client->flags & FLAG_BOOT_PONGO)) {
+		if (
+			!(client->flags & FLAG_TETHERED) && // !tethered
+			!(client->flags & FLAG_FETCH_BSEP)  // !pongoonly
+			)
+		{
 			if (build_identity_has_component(build_identity, "Cryptex1,AppOS") || build_identity_has_component(build_identity, "Cryptex1,SystemOS")) {
 				// need 'Cryptex1,Ticket'
 				int _found = 0;
@@ -1771,27 +1766,48 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 			has_se = true;
 		}
 		
-		if (has_bb) {
+		// BBFW
+		if (
+			has_bb &&
+			!(client->flags & FLAG_FETCH_BSEP)  // !pongoonly
+			)
+		{
 			fw_component_flag |= USE_SIGNED_BBFW;
 			if (client->bbfw.data && client->bbfw.length && client->bbfw.manifest) {
 				specific_fw_component_flag |= USE_SIGNED_BBFW;
 			}
 		}
-		if (has_se) {
+		
+		// SEFW
+		if (
+			has_se &&
+			!(client->flags & FLAG_FETCH_BSEP)  // !pongoonly
+			)
+		{
 			fw_component_flag |= USE_SIGNED_SEFW;
 			if (client->sefw.data && client->sefw.length && client->sefw.manifest) {
 				specific_fw_component_flag |= USE_SIGNED_SEFW;
 			}
 		}
-		if (client->sep_fwload_race || (client->flags & FLAG_TETHERED)) {
+		
+		// RSEP
+		if (
+			is_a10_variant_soc(client->cpid) ||    // A10 variant
+			(client->flags & FLAG_LOAD_BSEP_SHC) || // do fwload race
+			(client->flags & FLAG_TETHERED)        // tethered
+			)
+		{
 			fw_component_flag |= USE_SIGNED_RSEP;
 			if (client->rsep.data && client->rsep.length && client->rsep.manifest) {
 				specific_fw_component_flag |= USE_SIGNED_RSEP;
 			}
 		}
+		
+		// Base
 		if (
-			(client->build_major <= 13 && have_arm64_second_stage_iboot(client->cpid)) ||
-			((client->flags & FLAG_TETHERED) || (client->flags & FLAG_BOOT_PONGO))
+			(client->build_major <= 13 && have_arm64_second_stage_iboot(client->cpid)) || // ios <= 9
+			(client->flags & FLAG_TETHERED) || // tethered
+			(client->flags & FLAG_FETCH_BSEP)  // pongoonly
 			)
 		{
 			fw_component_flag |= USE_SIGNED_BASE;
@@ -2014,6 +2030,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 			}
 		}
 		
+		// BBFW
 		if (fw_component_flag & USE_SIGNED_BBFW) {
 			// load identity
 			if (get_identity_for_component(client, &client->bbfw) != 0) {
@@ -2036,6 +2053,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 			}
 		}
 		
+		// SEFW
 		if (fw_component_flag & USE_SIGNED_SEFW) {
 			// load identity
 			if (get_identity_for_component(client, &client->sefw) != 0) {
@@ -2058,6 +2076,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 			}
 		}
 		
+		// RSEP
 		if (fw_component_flag & USE_SIGNED_RSEP) {
 			// load identity
 			if (get_identity_for_component(client, &client->rsep) != 0) {
@@ -2080,6 +2099,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 			}
 		}
 		
+		// Base
 		if (fw_component_flag & USE_SIGNED_BASE) {
 			// load identity
 			if (get_identity_for_component(client, &client->base) != 0) {
@@ -2093,7 +2113,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 			logger(LL_INFO, "Base Firmware manifest information\n");
 			build_identity_print_information(client->base.identity);
 			
-			if (client->build_major <= 13 && have_arm64_second_stage_iboot(client->cpid)) {
+			if (client->build_major <= 13 && have_arm64_second_stage_iboot(client->cpid)) { // ios <= 9
 				if (download_component_by_name(fragment, "iBSS", NULL, &client->base) != 0) {
 					logger(LL_ERROR, "Unable to download iBSS\n");
 					if (fragment) {
@@ -2103,19 +2123,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 				}
 			}
 			
-			if (client->flags & FLAG_TETHERED) {
-				char* value = NULL;
-				plist_t manifest_node = NULL;
-				
-				manifest_node = plist_dict_get_item(client->base.identity, "Manifest");
-				if (!manifest_node || plist_get_node_type(manifest_node) != PLIST_DICT) {
-					logger(LL_ERROR, "Unable to find Manifest node\n");
-					if (fragment) {
-						fragmentzip_close(fragment);
-					}
-					return -1;
-				}
-				
+			if (client->flags & FLAG_TETHERED) { // tethered
 #define DL_FW_COMP(name) { \
 plist_t _item_node = plist_dict_get_item(manifest_node, #name); \
 if (!_item_node || plist_get_node_type(_item_node) != PLIST_DICT) { \
@@ -2165,6 +2173,17 @@ client->t_##name.im4p.data = (uint8_t *)tmp_buf; \
 client->t_##name.im4p.length = tmp_len; \
 logger(LL_DEBUG, "%s length: %zu\n", #name, client->t_##name.im4p.length); \
 }
+				char* value = NULL;
+				plist_t manifest_node = NULL;
+				
+				manifest_node = plist_dict_get_item(client->base.identity, "Manifest");
+				if (!manifest_node || plist_get_node_type(manifest_node) != PLIST_DICT) {
+					logger(LL_ERROR, "Unable to find Manifest node\n");
+					if (fragment) {
+						fragmentzip_close(fragment);
+					}
+					return -1;
+				}
 				
 				DL_FW_COMP(LLB);
 				DL_FW_COMP(iBoot);
@@ -2189,7 +2208,7 @@ logger(LL_DEBUG, "%s length: %zu\n", #name, client->t_##name.im4p.length); \
 		}
 	}
 	
-	if (client->flags & FLAG_TETHERED) {
+	if (client->flags & FLAG_TETHERED) { // tethered
 		int is_supported_version = 0;
 		if (
 			client->build_major == 10 || // iOS 6
@@ -2218,11 +2237,13 @@ logger(LL_DEBUG, "%s length: %zu\n", #name, client->t_##name.im4p.length); \
 		
 		// iOS 12
 		if (client->build_major == 16) {
-			if (strncmp(client->version, "12.0", 4) == 0 ||
+			if (
+				strncmp(client->version, "12.0", 4) == 0 ||
 				strncmp(client->version, "12.1", 4) == 0 ||
 				strncmp(client->version, "12.2", 4) == 0 ||
 				strncmp(client->version, "12.3", 4) == 0 ||
-				strncmp(client->version, "12.4", 4) == 0)
+				strncmp(client->version, "12.4", 4) == 0
+				)
 			{
 				is_supported_version = 1;
 			}
@@ -2230,14 +2251,16 @@ logger(LL_DEBUG, "%s length: %zu\n", #name, client->t_##name.im4p.length); \
 		
 		// iPadOS 18
 		if (client->build_major == 22) {
-			if (strncmp(client->version, "18.0", 4) == 0 ||
+			if (
+				strncmp(client->version, "18.0", 4) == 0 ||
 				strncmp(client->version, "18.1", 4) == 0 ||
 				strncmp(client->version, "18.2", 4) == 0 ||
 				strncmp(client->version, "18.3", 4) == 0 ||
 				strncmp(client->version, "18.4", 4) == 0 ||
 				strncmp(client->version, "18.5", 4) == 0 ||
 				strncmp(client->version, "18.6", 4) == 0 ||
-				strncmp(client->version, "18.7", 4) == 0)
+				strncmp(client->version, "18.7", 4) == 0
+				)
 			{
 				is_supported_version = 1;
 			}
@@ -2245,9 +2268,11 @@ logger(LL_DEBUG, "%s length: %zu\n", #name, client->t_##name.im4p.length); \
 		
 		// tvOS 26
 		if (client->build_major == 23) {
-			if (strncmp(client->version, "26.0", 4) == 0 ||
+			if (
+				strncmp(client->version, "26.0", 4) == 0 ||
 				strncmp(client->version, "26.1", 4) == 0 ||
-				strncmp(client->version, "26.2", 4) == 0)
+				strncmp(client->version, "26.2", 4) == 0
+				)
 			{
 				is_supported_version = 1;
 			}
@@ -2323,7 +2348,13 @@ logger(LL_DEBUG, "%s length: %zu\n", #name, client->t_##name.im4p.length); \
 	}
 
 #ifdef HAVE_TURDUS_MERULA
-	if (client->flags & FLAG_DOWNGRADE && client->get_pte_block && !client->sep_fwload_race) {
+	if (
+		(client->flags & FLAG_DOWNGRADE) &&
+		is_arm64_soc(client->cpid) &&
+		(client->flags & FLAG_FETCH_BSEP_PTE) &&
+		!(client->flags & FLAG_LOAD_BSEP_SHC)
+		)
+	{
 		if (is_a8_variant_soc(client->cpid)) {
 			// DEBUG: PASS
 		}
@@ -2438,7 +2469,7 @@ logger(LL_DEBUG, "%s length: %zu\n", #name, client->t_##name.im4p.length); \
 
 #ifdef HAVE_TURDUS_MERULA
 	if ((client->flags & FLAG_DOWNGRADE) && is_arm64_soc(client->cpid)) {
-		if (!(client->flags & FLAG_BOOT_PONGO)) { // checks the hashes of several important firmware components
+		if (!(client->flags & FLAG_FETCH_BSEP)) { // checks the hashes of several important firmware components
 			logger(LL_INFO, "Checking hashes...\n");
 			if (check_firmware_components(client, build_identity)) {
 				return -1;
@@ -2776,12 +2807,15 @@ logger(LL_DEBUG, "%s length: %zu\n", #name, client->t_##name.im4p.length); \
 	if (client->mode == MODE_RECOVERY) {
 #ifdef HAVE_TURDUS_MERULA
 		if ((client->flags & FLAG_DOWNGRADE) && is_arm64_soc(client->cpid)) {
-			if (!(client->flags & FLAG_BOOT_PONGO) || (client->sep_fwload_race && client->get_pte_block)) {
-				// extract sep im4p
-				if (client->sep_fwload_race || (client->flags & FLAG_TETHERED)) {
+			if (
+				(client->flags & FLAG_TETHERED) ||
+				((client->flags & (FLAG_LOAD_BSEP_SHC | FLAG_FETCH_BSEP_PTE)) == (FLAG_LOAD_BSEP_SHC | FLAG_FETCH_BSEP_PTE))
+				)
+			{
+				{
+					// extract sep im4p
 					char* sep_path = NULL;
-					if (build_identity_has_component(build_identity, "SEP") &&
-						build_identity_get_component_path(build_identity, "SEP", &sep_path) == 0) {
+					if (build_identity_has_component(build_identity, "SEP") && build_identity_get_component_path(build_identity, "SEP", &sep_path) == 0) {
 						if (extract_component(client->ipsw, sep_path, &client->sep.im4p.data, &client->sep.im4p.length) < 0) {
 							logger(LL_ERROR, "Unable to extract component: %s\n", "SEP");
 							if (sep_path) {
@@ -2797,7 +2831,7 @@ logger(LL_DEBUG, "%s length: %zu\n", #name, client->t_##name.im4p.length); \
 							return -1;
 						}
 						// save SEP.im4p for tethered
-						if (client->sep_fwload_race && (client->flags & FLAG_TETHERED)) {
+						if (client->flags & FLAG_TETHERED) {
 							char zfn[1024];
 							if (client->cache_dir) {
 								strcpy(zfn, client->cache_dir);
@@ -2835,8 +2869,8 @@ logger(LL_DEBUG, "%s length: %zu\n", #name, client->t_##name.im4p.length); \
 					}
 				}
 				
-				// boot_tz0 race is possible even without a valid SEP image
-				if (client->sep_fwload_race || (client->flags & FLAG_TETHERED)) {
+				{
+					// boot_tz0 race is possible even without a valid SEP image
 					if (!client->rsep.data || !client->rsep.identity) {
 						logger(LL_ERROR, "Could not find information about RestoreSEP\n");
 						return -1;
@@ -2911,7 +2945,11 @@ logger(LL_DEBUG, "%s length: %zu\n", #name, client->t_##name.im4p.length); \
 		if ((client->flags & FLAG_DOWNGRADE) && is_arm64_soc(client->cpid)) {
 			plist_t my_tss;
 			// allocate image4 manifest
-			if (client->flags & FLAG_TETHERED) {
+			if (
+				(client->flags & FLAG_TETHERED) ||
+				((client->flags & (FLAG_LOAD_BSEP_SHC | FLAG_FETCH_BSEP_PTE)) == (FLAG_LOAD_BSEP_SHC | FLAG_FETCH_BSEP_PTE))
+				)
+			{
 				if (!client->rsep.tss) {
 					logger(LL_ERROR, "no RestoreSEP shsh buffer\n");
 					return -1;
@@ -2919,6 +2957,7 @@ logger(LL_DEBUG, "%s length: %zu\n", #name, client->t_##name.im4p.length); \
 				my_tss = client->rsep.tss;
 			}
 			else {
+				// use cached blob
 				if (!client->local_shsh) {
 					logger(LL_ERROR, "no local shsh buffer\n");
 					return -1;
@@ -3028,7 +3067,7 @@ logger(LL_DEBUG, "%s length: %zu\n", #name, client->t_##name.im4p.length); \
 				int is_pongo_only = 0;
 				int is_tethered = 0;
 				unsigned int boot_delay = 0;
-				if (client->flags & FLAG_BOOT_PONGO) {
+				if (client->flags & FLAG_FETCH_BSEP) {
 					is_pongo_only = 1;
 				}
 				if (client->flags & FLAG_TETHERED) {
@@ -3045,7 +3084,7 @@ logger(LL_DEBUG, "%s length: %zu\n", #name, client->t_##name.im4p.length); \
 					return -1;
 				}
 				
-				if (client->flags & FLAG_BOOT_PONGO) {
+				if (client->flags & FLAG_FETCH_BSEP) {
 					mutex_unlock(&client->device_event_mutex);
 					return 0;
 				}
@@ -3805,14 +3844,15 @@ int main(int argc, char* argv[])
 					return EXIT_FAILURE;
 				}
 				if (client->sep_shellcode_block) {
-					free(client->sep_shellcode_block);
-					client->sep_shellcode_block = NULL;
+					logger(LL_ERROR, "Already block loaded\n");
+					usage(argc, argv, 1);
+					return EXIT_FAILURE;
 				}
 				if (read_file_safe(optarg, (void**)&client->sep_shellcode_block, &client->sep_shellcode_block_len, 0x400) != 0) {
 					return EXIT_FAILURE;
 				}
 				logger(LL_INFO, "Using SEP shellcode ciphertext block, found at %s length %zu\n", optarg, client->sep_shellcode_block_len);
-				client->sep_fwload_race = 1;
+				client->flags |= FLAG_LOAD_BSEP_SHC;
 				break;
 				
 			case 25:
@@ -3822,14 +3862,15 @@ int main(int argc, char* argv[])
 					return EXIT_FAILURE;
 				}
 				if (client->sep_shellcode_block) {
-					free(client->sep_shellcode_block);
-					client->sep_shellcode_block = NULL;
+					logger(LL_ERROR, "Already block loaded\n");
+					usage(argc, argv, 1);
+					return EXIT_FAILURE;
 				}
 				if (read_file_safe(optarg, (void**)&client->sep_shellcode_block, &client->sep_shellcode_block_len, 0x400) != 0) {
 					return EXIT_FAILURE;
 				}
 				logger(LL_INFO, "Using SEP page table entry ciphertext block, found at %s length %zu\n", optarg, client->sep_shellcode_block_len);
-				client->sep_boot_tz0_race = 1;
+				client->flags |= FLAG_LOAD_BSEP_PTE;
 				break;
 				
 			case 26:
@@ -3838,14 +3879,12 @@ int main(int argc, char* argv[])
 				
 			case 27:
 				client->flags |= FLAG_DOWNGRADE;
-				client->flags |= FLAG_BOOT_PONGO;
-				client->get_shc_block = 1;
+				client->flags |= FLAG_FETCH_BSEP_SHC;
 				break;
 				
 			case 28:
 				client->flags |= FLAG_DOWNGRADE;
-				client->flags |= FLAG_BOOT_PONGO;
-				client->get_pte_block = 1;
+				client->flags |= FLAG_FETCH_BSEP_PTE;
 				break;
 				
 			case 29:
@@ -4332,7 +4371,7 @@ int get_tss_response(struct idevicerestore_client_t* client, plist_t build_ident
 				logger(LL_INFO, "Using cached SHSH\n");
 				return 0;
 			}
-			else if ((client->flags & FLAG_TETHERED) || (client->flags & FLAG_BOOT_PONGO)) {
+			else if ((client->flags & FLAG_TETHERED) || (client->flags & FLAG_FETCH_BSEP_SHC)) {
 				if (client->base.tss) {
 					*tss = plist_copy(client->base.tss);
 					logger(LL_INFO, "Using cached SHSH\n");

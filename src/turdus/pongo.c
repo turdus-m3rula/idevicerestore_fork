@@ -285,8 +285,8 @@ int pongo_shell(struct idevicerestore_client_t* idr_client, struct irecv_device 
 				rv = irecv_usb_control_transfer_no_timeout_retval(client, 0xa1, 1, 0, 0, (unsigned char *)(buf + outpos), 0x1000, &r32);
 				if (rv == IRECV_E_SUCCESS) {
 					if (catch) {
-						if (idr_client->get_shc_block || idr_client->get_pte_block) {
-							if (idr_client->get_shc_block) {
+						if (idr_client->flags & FLAG_FETCH_BSEP) {
+							if (idr_client->flags & FLAG_FETCH_BSEP_SHC) {
 								typestr = "shcblock2";
 							}
 							else {
@@ -406,16 +406,16 @@ logger(LL_INFO, "Sent %s msg\n", name); \
 		
 		if (CURRENT_STAGE == LOAD_SEP_MODULE) {
 			PONGO_SEND_MSG("modload\n", "modload");
-			if (idr_client->get_shc_block) {
+			if (idr_client->flags & FLAG_FETCH_BSEP_SHC) {
 				CURRENT_STAGE = GET_SHC_BLOCK;
 				continue;
 			}
-			if (idr_client->get_pte_block && !idr_client->sep_fwload_race) {
+			if ((idr_client->flags & FLAG_FETCH_BSEP_PTE) && !(idr_client->flags & FLAG_LOAD_BSEP_SHC)) {
 				CURRENT_STAGE = GET_PTE_BLOCK;
 				continue;
 			}
 			if (g_just_boot_pongo) {
-				if (!idr_client->get_pte_block) {
+				if (!(idr_client->flags & FLAG_FETCH_BSEP_PTE)) {
 					return 0;
 				}
 				CURRENT_STAGE = SEND_APIGM4TICKET;
@@ -435,7 +435,7 @@ logger(LL_INFO, "Sent %s msg\n", name); \
 		if (CURRENT_STAGE == GET_PTE_BLOCK) {
 			PONGO_SEND_MSG("sep pte_get\n", "pte_get");
 			CURRENT_STAGE = USB_TRANSFER_ERROR;
-			if (idr_client->sep_fwload_race) {
+			if (idr_client->flags & FLAG_LOAD_BSEP_SHC) {
 				CURRENT_STAGE = SEND_RESET;
 			}
 			catch = 1;
@@ -450,7 +450,7 @@ logger(LL_INFO, "Sent %s msg\n", name); \
 				PONGO_SEND_MSG("sep xargsadd serial=3\n", "xargsadd");
 			}
 			CURRENT_STAGE = SEND_APIGM4TICKET;
-			if (idr_client->sep_boot_tz0_race) {
+			if (idr_client->flags & FLAG_LOAD_BSEP_PTE) {
 				CURRENT_STAGE = SEND_PTE;
 			}
 			continue;
@@ -553,7 +553,7 @@ logger(LL_INFO, "Sent %s msg\n", name); \
 		}
 		
 		if (CURRENT_STAGE == SET_SEP_FLAG) {
-			if (idr_client->get_pte_block) {
+			if (idr_client->flags & FLAG_FETCH_BSEP_PTE) {
 				PONGO_SEND_MSG("sep sep_flag e\n", "sep_flag");
 			}
 			else {
@@ -566,7 +566,7 @@ logger(LL_INFO, "Sent %s msg\n", name); \
 		if (CURRENT_STAGE == PWN_SEPROM) {
 			pwn_seprom_state = 1;
 			PONGO_SEND_MSG("sep pwn\n", "pwn");
-			if (idr_client->get_pte_block) {
+			if (idr_client->flags & FLAG_FETCH_BSEP_PTE) {
 				CURRENT_STAGE = GET_PTE_BLOCK;
 				continue;
 			}

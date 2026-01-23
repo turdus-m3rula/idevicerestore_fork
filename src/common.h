@@ -176,10 +176,6 @@ struct idevicerestore_client_t {
 	int disable_serial_output;
 	int use_custom_ticket;
 	int need_asr_patch;
-	int get_shc_block;
-	int get_pte_block;
-	int sep_fwload_race;
-	int sep_boot_tz0_race;
 	
 	// deviceinfo
 	uint16_t cpid;
