@@ -44,6 +44,70 @@
 #endif
 
 #pragma mark - common
+int read_aligned_file_safe(const char* filename, void** data, size_t* size, size_t max_size)
+{
+	size_t bytes = 0;
+	size_t length = 0;
+	FILE* file = NULL;
+	char* buffer = NULL;
+	struct stat fst;
+	
+	logger(LL_DEBUG, "Reading data from %s\n", filename);
+	
+	*size = 0;
+	*data = NULL;
+	
+	file = fopen(filename, "rb");
+	if (file == NULL) {
+		logger(LL_ERROR, "read_file: cannot open %s: %s\n", filename, strerror(errno));
+		return -1;
+	}
+	
+	if (fstat(fileno(file), &fst) < 0) {
+		logger(LL_ERROR, "read_file: fstat: %s\n", strerror(errno));
+		fclose(file);
+		return -1;
+	}
+	if (fst.st_size < 0) {
+		logger(LL_ERROR, "Invalid file size\n");
+		fclose(file);
+		return -1;
+	}
+	length = (size_t)fst.st_size;
+	if (length == 0 || length > max_size) {
+		logger(LL_ERROR, "File is empty or exceeds limit\n");
+		fclose(file);
+		return -1;
+	}
+	
+	void* tmp_buffer = NULL;
+	int res = posix_memalign(&tmp_buffer, sizeof(uint64_t), length);
+	if (res != 0) {
+		logger(LL_ERROR, "memalign failed (reason: %s)", strerror(res));
+		fclose(file);
+		return -1;
+	}
+	if (tmp_buffer == NULL) {
+		logger(LL_ERROR, "Out of memory\n");
+		fclose(file);
+		return -1;
+	}
+	
+	buffer = (char*)tmp_buffer;
+	bytes = fread(buffer, 1, length, file);
+	fclose(file);
+	
+	if (bytes != length) {
+		logger(LL_ERROR, "Unable to read entire file\n");
+		free(buffer);
+		return -1;
+	}
+	
+	*size = length;
+	*data = buffer;
+	return 0;
+}
+
 int read_file_safe(const char* filename, void** data, size_t* size, size_t max_size)
 {
 	size_t bytes = 0;

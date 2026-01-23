@@ -2650,14 +2650,14 @@ logger(LL_DEBUG, "%s length: %zu\n", #name, client->t_##name.im4p.length); \
 					char* sep_path = NULL;
 					if (build_identity_has_component(build_identity, "SEP") &&
 						build_identity_get_component_path(build_identity, "SEP", &sep_path) == 0) {
-						if (extract_component(client->ipsw, sep_path, &client->image4_sepi.im4p.data, &client->image4_sepi.im4p.length) < 0) {
+						if (extract_component(client->ipsw, sep_path, &client->sep.im4p.data, &client->sep.im4p.length) < 0) {
 							logger(LL_ERROR, "Unable to extract component: %s\n", "SEP");
 							if (sep_path) {
 								free(sep_path);
 							}
 							return -1;
 						}
-						if (!client->image4_sepi.im4p.data) {
+						if (!client->sep.im4p.data) {
 							if (sep_path) {
 								free(sep_path);
 							}
@@ -2679,13 +2679,13 @@ logger(LL_DEBUG, "%s length: %zu\n", #name, client->t_##name.im4p.length); \
 							FILE *zf = fopen(zfn, "wb");
 							if (!zf) {
 								logger(LL_ERROR, "Opening %s\n", zfn);
-								free(client->image4_sepi.im4p.data);
+								free(client->sep.im4p.data);
 								if (sep_path) {
 									free(sep_path);
 								}
 								return -1;
 							}
-							fwrite(client->image4_sepi.im4p.data, client->image4_sepi.im4p.length, 1, zf);
+							fwrite(client->sep.im4p.data, client->sep.im4p.length, 1, zf);
 							fflush(zf);
 							fclose(zf);
 							logger(LL_INFO, "SEP im4p saved to '%s'\n", zfn);
@@ -2713,7 +2713,7 @@ logger(LL_DEBUG, "%s length: %zu\n", #name, client->t_##name.im4p.length); \
 						logger(LL_ERROR, "Unable to get latest SHSH\n");
 						return -1;
 					}
-					if (personalize_component(client, "RestoreSEP", client->rsep.data, client->rsep.length, client->rsep.tss, &client->image4_rsep.img4.data, &client->image4_rsep.img4.length) < 0) {
+					if (personalize_component(client, "RestoreSEP", client->rsep.data, client->rsep.length, client->rsep.tss, &client->sep.img4.data, &client->sep.img4.length) < 0) {
 						logger(LL_ERROR, "Unable to get personalized component: %s\n", "RestoreSEP");
 						return -1;
 					}
@@ -2797,10 +2797,10 @@ logger(LL_DEBUG, "%s length: %zu\n", #name, client->t_##name.im4p.length); \
 			plist_t apimg4ticket_tss = plist_dict_get_item(my_tss, "ApImg4Ticket");
 			if (apimg4ticket_tss) {
 				uint64_t im4m_length = 0;
-				plist_get_data_val(apimg4ticket_tss, (char**)&client->image4_rsep.im4m.data, &im4m_length);
-				client->image4_rsep.im4m.length = (size_t)im4m_length;
+				plist_get_data_val(apimg4ticket_tss, (char**)&client->sep.im4m.data, &im4m_length);
+				client->sep.im4m.length = (size_t)im4m_length;
 			}
-			if (!client->image4_rsep.im4m.data) {
+			if (!client->sep.im4m.data) {
 				logger(LL_ERROR, "no img4 manifest\n");
 				return -1;
 			}
@@ -2810,45 +2810,45 @@ logger(LL_DEBUG, "%s length: %zu\n", #name, client->t_##name.im4p.length); \
 				memset(tsha384, 0, SHA384_DIGEST_LENGTH);
 				sha384_context sha384ctx;
 				sha384_init(&sha384ctx);
-				sha384_update(&sha384ctx, client->image4_rsep.im4m.data, client->image4_rsep.im4m.length);
+				sha384_update(&sha384ctx, client->sep.im4m.data, client->sep.im4m.length);
 				sha384_final(&sha384ctx, tsha384);
-				client->image4_rsep.im4m.hash_length = SHA384_DIGEST_LENGTH;
-				client->image4_rsep.im4m.hash = malloc(client->image4_rsep.im4m.hash_length);
-				if (!client->image4_rsep.im4m.hash) {
+				client->sep.mhash.length = SHA384_DIGEST_LENGTH;
+				client->sep.mhash.data = malloc(client->sep.mhash.length);
+				if (!client->sep.mhash.data) {
 					logger(LL_ERROR, "malloc failed\n");
 					return -1;
 				}
-				memset(client->image4_rsep.im4m.hash, 0, client->image4_rsep.im4m.hash_length);
-				memcpy(client->image4_rsep.im4m.hash, tsha384, SHA384_DIGEST_LENGTH);
+				memset(client->sep.mhash.data, 0, client->sep.mhash.length);
+				memcpy(client->sep.mhash.data, tsha384, SHA384_DIGEST_LENGTH);
 			}
 			else if (have_arm64_second_stage_iboot(client->cpid)) {
 				unsigned char tsha1[SHA1_DIGEST_LENGTH];
 				memset(tsha1, 0, SHA1_DIGEST_LENGTH);
 				sha1_context sha1ctx;
 				sha1_init(&sha1ctx);
-				sha1_update(&sha1ctx, client->image4_rsep.im4m.data, client->image4_rsep.im4m.length);
+				sha1_update(&sha1ctx, client->sep.im4m.data, client->sep.im4m.length);
 				sha1_final(&sha1ctx, tsha1);
-				client->image4_rsep.im4m.hash_length = SHA1_DIGEST_LENGTH;
-				client->image4_rsep.im4m.hash = malloc(client->image4_rsep.im4m.hash_length);
-				if (!client->image4_rsep.im4m.hash) {
+				client->sep.mhash.length = SHA1_DIGEST_LENGTH;
+				client->sep.mhash.data = malloc(client->sep.mhash.length);
+				if (!client->sep.mhash.data) {
 					logger(LL_ERROR, "malloc failed\n");
 					return -1;
 				}
-				memset(client->image4_rsep.im4m.hash, 0, client->image4_rsep.im4m.hash_length);
-				memcpy(client->image4_rsep.im4m.hash, tsha1, SHA1_DIGEST_LENGTH);
+				memset(client->sep.mhash.data, 0, client->sep.mhash.length);
+				memcpy(client->sep.mhash.data, tsha1, SHA1_DIGEST_LENGTH);
 			}
 			else {
 				logger(LL_ERROR, "Found unknown device\n");
 				return -1;
 			}
-			if (!client->image4_rsep.im4m.hash) {
+			if (!client->sep.mhash.data) {
 				logger(LL_ERROR, "no img4 manifest hash\n");
 				return -1;
 			}
 			
-			uint8_t* _manifest_hash = (uint8_t*)client->image4_rsep.im4m.hash;
+			uint8_t* _manifest_hash = (uint8_t*)client->sep.mhash.data;
 			fprintf(stderr, "img4 manifest hash: ");
-			for (int i = 0; i < client->image4_rsep.im4m.hash_length; i++) {
+			for (int i = 0; i < client->sep.mhash.length; i++) {
 				fprintf(stderr, "%02x", _manifest_hash[i]);
 			}
 			fprintf(stderr, "\n");
@@ -3150,17 +3150,17 @@ void idevicerestore_client_free(struct idevicerestore_client_t* client)
 	if (client->cryptex1_nonce_seed) {
 		free(client->cryptex1_nonce_seed);
 	}
-	if (client->image4_sepi.im4p.data) {
-		free(client->image4_sepi.im4p.data);
+	if (client->sep.im4p.data) {
+		free(client->sep.im4p.data);
 	}
-	if (client->image4_rsep.img4.data) {
-		free(client->image4_rsep.img4.data);
+	if (client->sep.img4.data) {
+		free(client->sep.img4.data);
 	}
-	if (client->image4_rsep.im4m.data) {
-		free(client->image4_rsep.im4m.data);
+	if (client->sep.im4m.data) {
+		free(client->sep.im4m.data);
 	}
-	if (client->image4_rsep.im4m.hash) {
-		free(client->image4_rsep.im4m.hash);
+	if (client->sep.mhash.data) {
+		free(client->sep.mhash.data);
 	}
 	if (client->sep_shellcode_block) {
 		free(client->sep_shellcode_block);

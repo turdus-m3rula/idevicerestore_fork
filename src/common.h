@@ -101,13 +101,15 @@ typedef struct {
 typedef struct {
 	void* data;
 	size_t length;
-	void* hash;
-	size_t hash_length;
 } image_component_t;
 typedef struct {
 	image_component_t im4p;
 	image_component_t im4m;
+	image_component_t mhash;
 	image_component_t img4;
+} sep_image4_component_t;
+typedef struct {
+	image_component_t im4p;
 } image4_component_t;
 #endif
 
@@ -163,6 +165,7 @@ struct idevicerestore_client_t {
 	int async_err;
 	
 #ifdef HAVE_TURDUS_MERULA
+	// flag
 	uint64_t kpf_flag;
 	uint64_t cpf_flag;
 	uint64_t sep_racer_flag;
@@ -171,25 +174,25 @@ struct idevicerestore_client_t {
 	uint64_t union_iphoneos_flag;
 	uint64_t union_tvos_flag;
 	
+	// mark
 	int disable_serial_output;
-	uint16_t cpid;
-	uint8_t bdid;
-	plist_t local_shsh;
 	int use_custom_ticket;
-	
 	int need_asr_patch;
-	
 	int get_shc_block;
 	int get_pte_block;
-	
 	int sep_fwload_race;
 	int sep_boot_tz0_race;
 	
+	// deviceinfo
+	uint16_t cpid;
+	uint8_t bdid;
+	
+	// cached blob
+	plist_t local_shsh;
 	char* cryptex1_nonce_seed;
 	
-	image4_component_t image4_sepi;
-	image4_component_t image4_rsep;
-	
+	// sep
+	sep_image4_component_t sep;
 	void* sep_shellcode_block;
 	size_t sep_shellcode_block_len;
 	

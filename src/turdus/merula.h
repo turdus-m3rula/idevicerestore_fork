@@ -74,6 +74,7 @@ typedef struct {
 #define IMG4_DIGEST_MATCHED_PAYLOAD   (1 << 3)
 
 #pragma mark - common
+int read_aligned_file_safe(const char* filename, void** data, size_t* size, size_t max_size);
 int read_file_safe(const char* filename, void** data, size_t* size, size_t max_size);
 void print_module_hash(const char* name, const uint8_t* buf, const size_t length);
 uint32_t read_u32_le(const uint8_t *p);
