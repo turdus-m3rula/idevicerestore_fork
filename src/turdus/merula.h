@@ -73,6 +73,22 @@ typedef struct {
 #define IMG4_DIGEST_VALID_PAYLOAD     (1 << 2)
 #define IMG4_DIGEST_MATCHED_PAYLOAD   (1 << 3)
 
+#pragma mark - global
+void* gPongoOS;
+size_t gPongoOSLength;
+
+void* gSEPRacer;
+size_t gSEPRacerLength;
+
+void* gKPF;
+size_t gKPFLength;
+
+void* gCPF;
+size_t gCPFLength;
+
+void* gRAMDisk;
+size_t gRAMDiskLength;
+
 #pragma mark - common
 int read_aligned_file_safe(const char* filename, void** data, size_t* size, size_t max_size);
 int read_file_safe(const char* filename, void** data, size_t* size, size_t max_size);

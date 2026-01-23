@@ -12,13 +12,6 @@
 #include "../idevicerestore.h"
 #include "../common.h"
 
-#include "../stuff/Pongo_bin.h"
-#include "../stuff/cpf_bin.h"
-#include "../stuff/kpf_bin.h"
-#include "../stuff/sep_racer_bin.h"
-#include "../stuff/overlay_bin.h"
-#include "../stuff/union_bin.h"
-
 static enum AUTOBOOT_STAGE CURRENT_STAGE = NONE;
 
 static const uint8_t lz4dec_bin[] = {
@@ -118,7 +111,7 @@ static int lz4_compress_and_add_shc(const void *inbuf, const size_t insize, void
 
 static int patch_pongo(uint8_t* pongo, const size_t sz, int sigcheckPatch)
 {
-	const uint64_t magicval = 0x1337cafebabe4100uLL;
+	const uint64_t magicval = PONGO_MAGIC_VALUE;
 	uint64_t ipf_flag = IPF_NONE;
 	if (sigcheckPatch) {
 		ipf_flag |= IPF_SIG_CHECK_PATCH;
@@ -146,7 +139,7 @@ int send_pongo_image(struct idevicerestore_client_t* client)
 	void *PongoImage = NULL;
 	size_t PongoSize = 0;
 	
-	size_t pongoRawSize = Pongo_bin_len;
+	size_t pongoRawSize = gPongoOSLength;
 	if (pongoRawSize > 0x100000) {
 		logger(LL_ERROR, "Too large pongo bin");
 		return -1;
@@ -157,9 +150,9 @@ int send_pongo_image(struct idevicerestore_client_t* client)
 		return -1;
 	}
 	memset(pongoRawImage, 0, pongoRawSize);
-	memcpy(pongoRawImage, &Pongo_bin, pongoRawSize);
+	memcpy(pongoRawImage, gPongoOS, pongoRawSize);
 	
-	if (patch_pongo(pongoRawImage, pongoRawSize, 1)) {
+	if (patch_pongo(pongoRawImage, pongoRawSize, 1) != 0) {
 		logger(LL_ERROR, "Magic not found\n");
 		return -1;
 	}
@@ -406,7 +399,7 @@ logger(LL_INFO, "Sent %s msg\n", name); \
 		}
 		
 		if (CURRENT_STAGE == SEND_SEP_MODULE) {
-			PONGO_SEND_BUFFER(sep_racer_bin, sep_racer_bin_len, "sep_racer");
+			PONGO_SEND_BUFFER(gSEPRacer, gSEPRacerLength, "sep_racer");
 			CURRENT_STAGE = LOAD_SEP_MODULE;
 			continue;
 		}
@@ -594,7 +587,7 @@ logger(LL_INFO, "Sent %s msg\n", name); \
 		}
 		
 		if (CURRENT_STAGE == SEND_KPF_TETHERED) {
-			PONGO_SEND_BUFFER(kpf_bin, kpf_bin_len, "uploadKpfModule");
+			PONGO_SEND_BUFFER(gKPF, gKPFLength, "uploadKpfModule");
 			CURRENT_STAGE = LOAD_KPF_TETHERED;
 			continue;
 		}
@@ -618,32 +611,26 @@ logger(LL_INFO, "Sent %s msg\n", name); \
 			char* path = NULL;
 			uint8_t* cur_bin_buf = NULL;
 			size_t cur_bin_size = 0;
+			cur_bin_buf = (uint8_t*)gRAMDisk;
+			cur_bin_size = (size_t)gRAMDiskLength;
 			if (idr_client->build_major == 14 || idr_client->build_major == 15) {
 				if (boot_delay == 0) {
 					flag = 0x2222;
 					path = "union.dmg[iPhoneOS]";
-					cur_bin_buf = (uint8_t*)union_iphoneos_bin;
-					cur_bin_size = (size_t)union_iphoneos_bin_len;
 				}
 				else {
 					flag = 0x2222;
 					path = "union.dmg[tvOS]";
-					cur_bin_buf = (uint8_t*)union_tvos_bin;
-					cur_bin_size = (size_t)union_tvos_bin_len;
 				}
 			}
 			else {
 				if (boot_delay == 0) {
 					flag = 0x1111;
 					path = "overlay.dmg[iPhoneOS]";
-					cur_bin_buf = (uint8_t*)overlay_iphoneos_bin;
-					cur_bin_size = (size_t)overlay_iphoneos_bin_len;
 				}
 				else {
 					flag = 0x1111;
 					path = "overlay.dmg[tvOS]";
-					cur_bin_buf = (uint8_t*)overlay_tvos_bin;
-					cur_bin_size = (size_t)overlay_tvos_bin_len;
 				}
 			}
 			if (cur_bin_buf == NULL) {
@@ -679,7 +666,7 @@ logger(LL_INFO, "Sent %s msg\n", name); \
 		}
 		
 		if (CURRENT_STAGE == SEND_CRYPTEX1_NONCE_SETTER) {
-			PONGO_SEND_BUFFER(cpf_bin, cpf_bin_len, "uploadCpfModule");
+			PONGO_SEND_BUFFER(gCPF, gCPFLength, "uploadCpfModule");
 			CURRENT_STAGE = LOAD_CRYPTEX1_NONCE_SETTER;
 			continue;
 		}

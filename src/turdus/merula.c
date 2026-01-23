@@ -43,6 +43,22 @@
 #include "../libhfsplus/hfs_patch_asr.h"
 #endif
 
+#pragma mark - global
+void* gPongoOS = NULL;
+size_t gPongoOSLength = 0;
+
+void* gSEPRacer = NULL;
+size_t gSEPRacerLength = 0;
+
+void* gKPF = NULL;
+size_t gKPFLength = 0;
+
+void* gCPF = NULL;
+size_t gCPFLength = 0;
+
+void* gRAMDisk = NULL;
+size_t gRAMDiskLength = 0;
+
 #pragma mark - common
 int read_aligned_file_safe(const char* filename, void** data, size_t* size, size_t max_size)
 {
@@ -1173,17 +1189,9 @@ int check_firmware_components(struct idevicerestore_client_t* client, plist_t bu
 							logger(LL_ERROR, "Found unsupported module (name: %s)\n", "kpf");
 							return -1;
 						}
-						if (is_tvos == 0) { // iPhoneOS
-							if (0 == check_vflag(client->union_iphoneos_flag, vflag)) {
-								logger(LL_ERROR, "Found unsupported module (name: %s)\n", "union.dmg[iPhoneOS]");
-								return -1;
-							}
-						}
-						if (is_tvos == 1) { // tvOS
-							if (0 == check_vflag(client->union_tvos_flag, vflag)) {
-								logger(LL_ERROR, "Found unsupported module (name: %s)\n", "union.dmg[tvOS]");
-								return -1;
-							}
+						if (0 == check_vflag(client->ramdisk_flag, vflag)) {
+							logger(LL_ERROR, "Found unsupported module (name: %s)\n", "RAMDisk.dmg");
+							return -1;
 						}
 					}
 					break;

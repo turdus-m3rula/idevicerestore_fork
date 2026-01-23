@@ -140,6 +140,12 @@ static struct option longopts[] = {
 	{ "allow-unsupport", no_argument,       NULL, 29  },
 	{ "show-hash",       no_argument,       NULL, 30  },
 	{ "api-url",         required_argument, NULL, 31  },
+	
+	{ "override-kpf", required_argument, NULL, 32 },
+	{ "override-cpf", required_argument, NULL, 33 },
+	{ "override-sep-racer", required_argument, NULL, 34 },
+	{ "override-pongo", required_argument, NULL, 35 },
+	{ "override-ramdisk", required_argument, NULL, 36 },
 #endif
 	{ NULL, 0, NULL, 0 }
 };
@@ -179,6 +185,11 @@ static void usage(int argc, char* argv[], int err)
 "  --get-pteblock               Acquire pteblock required for SEPROM exploit (boot_tz0 race) on A9/A9X devices\n" \
 "  --allow-unsupport            Allow restore to an unsupported firmware version\n" \
 "  --api-url URL                Override default API server URL\n" \
+"  --override-kpf PATH          Override KPF module\n" \
+"  --override-cpf PATH          Override CPF module\n" \
+"  --override-sep-racer PATH    Override sep_racer module\n" \
+"  --override-pongo PATH        Override Pongo\n" \
+"  --override-ramdisk PATH      Override overlay ramdisk\n" \
 "  --show-hash                  Show the SHA2-384 hashes of embedded modules\n\n" \
 "\nThis is a fork of idevicerestore\n"
 #else
@@ -718,143 +729,6 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 			return -2;
 		}
 		
-		// check module flags
-		if (is_arm64_soc(client->cpid)) {
-			uint64_t kpf_flag = 0;
-			uint64_t cpf_flag = 0;
-			uint64_t sep_racer_flag = 0;
-			uint64_t overlay_iphoneos_flag = 0;
-			uint64_t overlay_tvos_flag = 0;
-			uint64_t union_iphoneos_flag = 0;
-			uint64_t union_tvos_flag = 0;
-			
-			if (load_rdsk_flag((const uint8_t*)overlay_iphoneos_bin, overlay_iphoneos_bin_len, 0x1111, "overlay.dmg[iPhoneOS]", &overlay_iphoneos_flag)) {
-				return -2;
-			}
-			if (load_rdsk_flag((const uint8_t*)overlay_tvos_bin, overlay_tvos_bin_len, 0x1111, "overlay.dmg[tvOS]", &overlay_tvos_flag)) {
-				return -2;
-			}
-			if (load_rdsk_flag((const uint8_t*)union_iphoneos_bin, union_iphoneos_bin_len, 0x2222, "union.dmg[iPhoneOS]", &union_iphoneos_flag)) {
-				return -2;
-			}
-			if (load_rdsk_flag((const uint8_t*)union_tvos_bin, union_tvos_bin_len, 0x2222, "union.dmg[tvOS]", &union_tvos_flag)) {
-				return -2;
-			}
-			if (load_module_flag((const uint8_t*)cpf_bin, cpf_bin_len, 0xAAAA000000009990uLL, "cpf", &cpf_flag)) {
-				return -2;
-			}
-			if (load_module_flag((const uint8_t*)kpf_bin, kpf_bin_len, 0xBBBB000000009990uLL, "kpf", &kpf_flag)) {
-				return -2;
-			}
-			if (load_module_flag((const uint8_t*)sep_racer_bin, sep_racer_bin_len, 0xCCCC000000009990uLL, "sep_racer", &sep_racer_flag)) {
-				return -2;
-			}
-			client->kpf_flag = kpf_flag;
-			client->cpf_flag = cpf_flag;
-			client->sep_racer_flag = sep_racer_flag;
-			client->overlay_iphoneos_flag = overlay_iphoneos_flag;
-			client->overlay_tvos_flag = overlay_tvos_flag;
-			client->union_iphoneos_flag = union_iphoneos_flag;
-			client->union_tvos_flag = union_tvos_flag;
-			
-			// check module compatibility
-			int module_unsupported = 0;
-			uint64_t vflag = convert_cpid_bdid_to_plat_vflag(client->cpid, client->bdid);
-			int is_tvos = is_tvos_with_cpid_bdid(client->cpid, client->bdid);
-			if (is_tvos == -1) {
-				logger(LL_ERROR, "Unknown bdid (BDID: 0x%02x)\n", (uint8_t)client->bdid);
-				module_unsupported = 1;
-			}
-			if (is_tvos == 0) { // iPhoneOS
-				if (0 == check_vflag(client->overlay_iphoneos_flag, vflag)) {
-					logger(LL_DEBUG, "Found unsupported module (name: %s)\n", "overlay.dmg[iPhoneOS]");
-					module_unsupported = 1;
-				}
-				if (0 == check_vflag(client->union_iphoneos_flag, vflag)) {
-					logger(LL_DEBUG, "Found unsupported module (name: %s)\n", "union.dmg[iPhoneOS]");
-					module_unsupported = 1;
-				}
-			}
-			if (is_tvos == 1) { // tvOS
-				if (0 == check_vflag(client->overlay_tvos_flag, vflag)) {
-					logger(LL_DEBUG, "Found unsupported module (name: %s)\n", "overlay.dmg[tvOS]");
-					module_unsupported = 1;
-				}
-				if (0 == check_vflag(client->union_tvos_flag, vflag)) {
-					logger(LL_DEBUG, "Found unsupported module (name: %s)\n", "union.dmg[tvOS]");
-					module_unsupported = 1;
-				}
-			}
-			if (!is_a8_variant_soc(client->cpid)) {
-				if (0 == check_vflag(client->cpf_flag, vflag)) {
-					logger(LL_DEBUG, "Found unsupported module (name: %s)\n", "cpf");
-					module_unsupported = 1;
-				}
-			}
-			if (0 == check_vflag(client->kpf_flag, vflag)) {
-				logger(LL_DEBUG, "Found unsupported module (name: %s)\n", "kpf");
-				module_unsupported = 1;
-			}
-			if (0 == check_vflag(client->sep_racer_flag, vflag)) {
-				logger(LL_DEBUG, "Found unsupported module (name: %s)\n", "sep_racer");
-				module_unsupported = 1;
-			}
-			
-			if (module_unsupported) {
-				logger(LL_ERROR, "Unsupported device (CPID: %04x)\n", client->cpid);
-				return -2;
-			}
-		}
-		
-		logger(LL_DEBUG, "Found supported device (CPID: %04x)\n", client->cpid);
-		
-		if (client->get_shc_block || client->get_pte_block) {
-			if (is_a10_variant_soc(client->cpid)) {
-				logger(LL_ERROR, "This device does not requires SEP ciphertext block\n");
-				return -2;
-			}
-			if (client->get_shc_block && client->get_pte_block) {
-				logger(LL_ERROR, "Conflict detected\n");
-				return -2;
-			}
-		}
-		
-		if (client->sep_shellcode_block && client->sep_shellcode_block_len) {
-			if (client->sep_shellcode_block_len == 0x80) {
-				logger(LL_INFO, "This block is old version!\n");
-				uint8_t zero[0x10] = { 0 };
-				memset(zero, 0, 0x10);
-				if (memcmp(client->sep_shellcode_block + 0x30, zero, 0x10) || memcmp(client->sep_shellcode_block + 0x70, zero, 0x10)) {
-					logger(LL_ERROR, "block type check failed!\n");
-					return -2;
-				}
-			}
-			else {
-				logger(LL_INFO, "Checking block type\n");
-				bool _bsep_is_valid = 0;
-				sep_block_t* bsep = (sep_block_t*)client->sep_shellcode_block;
-				uint32_t myType = 0;
-				if (get_bsep_type(bsep, &myType) == false) {
-					logger(LL_ERROR, "block type check failed!\n");
-					return -2;
-				}
-				if (myType == BSEP_TYPE_SHC) {
-					if (client->sep_fwload_race) {
-						_bsep_is_valid = 1;
-					}
-				}
-				if (myType == BSEP_TYPE_PTE) {
-					if (client->sep_boot_tz0_race) {
-						_bsep_is_valid = 1;
-					}
-				}
-				if (!_bsep_is_valid) {
-					logger(LL_ERROR, "Invalid block type!\n");
-					return -2;
-				}
-			}
-		}
-		
 		// check shsh
 		// some modes require fetching from the server, so don't check them yet
 		if (!(client->flags & FLAG_TETHERED) && !(client->flags & FLAG_BOOT_PONGO)) {
@@ -1299,8 +1173,286 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 	logger(LL_INFO, "IPSW Product Build: %s Major: %d\n", client->build, client->build_major);
 
 #ifdef HAVE_TURDUS_MERULA
+	// check RAMDisk type
+#define RDSK_TYPE_NONE          (0)
+#define RDSK_TYPE_UNION_IOS     (1u << 0)
+#define RDSK_TYPE_UNION_TVOS    (1u << 1)
+#define RDSK_TYPE_DYLDHOOK_IOS  (1u << 2)
+#define RDSK_TYPE_DYLDHOOK_TVOS (1u << 3)
+	uint32_t rdsk_type = RDSK_TYPE_NONE;
+	{
+		int is_tvos = is_tvos_with_cpid_bdid(client->cpid, client->bdid);
+		if (client->build_major >= 14) {
+			if (client->build_major == 14 || client->build_major == 15) {
+				if (is_tvos == 0) { // iPhoneOS
+					rdsk_type |= RDSK_TYPE_UNION_IOS;
+				}
+				if (is_tvos == 1) { // tvOS
+					rdsk_type |= RDSK_TYPE_UNION_TVOS;
+				}
+			}
+			else {
+				if (is_tvos == 0) { // iPhoneOS
+					rdsk_type |= RDSK_TYPE_DYLDHOOK_IOS;
+				}
+				if (is_tvos == 1) { // tvOS
+					rdsk_type |= RDSK_TYPE_DYLDHOOK_TVOS;
+				}
+			}
+		}
+	}
+	logger(LL_INFO, "RAMDisk type: 0x%04x\n", rdsk_type);
+	
+	// load RAMDisk
+	if (rdsk_type != 0) {
+		if (gRAMDisk == NULL) {
+			logger(LL_INFO, "Loading overlay ramdisk...\n");
+			unsigned int ramdisk_length = 0;
+			void* ramdisk_buffer = NULL;
+			if (rdsk_type & RDSK_TYPE_UNION_IOS) {
+				ramdisk_buffer = union_iphoneos_bin;
+				ramdisk_length = union_iphoneos_bin_len;
+			}
+			else if (rdsk_type & RDSK_TYPE_UNION_TVOS) {
+				ramdisk_buffer = union_tvos_bin;
+				ramdisk_length = union_tvos_bin_len;
+			}
+			else if (rdsk_type & RDSK_TYPE_DYLDHOOK_IOS) {
+				ramdisk_buffer = overlay_iphoneos_bin;
+				ramdisk_length = overlay_iphoneos_bin_len;
+			}
+			else if (rdsk_type & RDSK_TYPE_DYLDHOOK_TVOS) {
+				ramdisk_buffer = overlay_tvos_bin;
+				ramdisk_length = overlay_tvos_bin_len;
+			}
+			else {
+				logger(LL_ERROR, "Invalid rdsk_type\n");
+				return -1;
+			}
+			void* tmp_buffer = NULL;
+			int res = posix_memalign(&tmp_buffer, sizeof(uint64_t), ramdisk_length);
+			if (res != 0) {
+				logger(LL_ERROR, "memalign failed (reason: %s)", strerror(res));
+				return -1;
+			}
+			if (tmp_buffer == NULL) {
+				logger(LL_ERROR, "Out of memory\n");
+				return -1;
+			}
+			memcpy(tmp_buffer, ramdisk_buffer, ramdisk_length);
+			gRAMDisk = tmp_buffer;
+			gRAMDiskLength = ramdisk_length;
+			logger(LL_INFO, "Loaded embedded overlay ramdisk, length %zu\n", gRAMDiskLength);
+		}
+	}
+	
+	// load module and pongo
+	if (gPongoOS == NULL) {
+		logger(LL_INFO, "Loading Pongo...\n");
+		void* tmp_buffer = NULL;
+		int res = posix_memalign(&tmp_buffer, sizeof(uint64_t), Pongo_bin_len);
+		if (res != 0) {
+			logger(LL_ERROR, "memalign failed (reason: %s)", strerror(res));
+			return -1;
+		}
+		if (tmp_buffer == NULL) {
+			logger(LL_ERROR, "Out of memory\n");
+			return -1;
+		}
+		memcpy(tmp_buffer, Pongo_bin, Pongo_bin_len);
+		gPongoOS = tmp_buffer;
+		gPongoOSLength = Pongo_bin_len;
+		logger(LL_INFO, "Loaded embedded Pongo, length %zu\n", gPongoOSLength);
+	}
+	if (gSEPRacer == NULL) {
+		logger(LL_INFO, "Loading sep_racer...\n");
+		void* tmp_buffer = NULL;
+		int res = posix_memalign(&tmp_buffer, sizeof(uint64_t), sep_racer_bin_len);
+		if (res != 0) {
+			logger(LL_ERROR, "memalign failed (reason: %s)", strerror(res));
+			return -1;
+		}
+		if (tmp_buffer == NULL) {
+			logger(LL_ERROR, "Out of memory\n");
+			return -1;
+		}
+		memcpy(tmp_buffer, sep_racer_bin, sep_racer_bin_len);
+		gSEPRacer = tmp_buffer;
+		gSEPRacerLength = sep_racer_bin_len;
+		logger(LL_INFO, "Loaded embedded sep_racer module, length %zu\n", gSEPRacerLength);
+	}
+	if (gKPF == NULL) {
+		logger(LL_INFO, "Loading kpf...\n");
+		void* tmp_buffer = NULL;
+		int res = posix_memalign(&tmp_buffer, sizeof(uint64_t), kpf_bin_len);
+		if (res != 0) {
+			logger(LL_ERROR, "memalign failed (reason: %s)", strerror(res));
+			return -1;
+		}
+		if (tmp_buffer == NULL) {
+			logger(LL_ERROR, "Out of memory\n");
+			return -1;
+		}
+		memcpy(tmp_buffer, kpf_bin, kpf_bin_len);
+		gKPF = tmp_buffer;
+		gKPFLength = kpf_bin_len;
+		logger(LL_INFO, "Loaded embedded kpf module, length %zu\n", gKPFLength);
+	}
+	if (gCPF == NULL) {
+		logger(LL_INFO, "Loading cpf...\n");
+		void* tmp_buffer = NULL;
+		int res = posix_memalign(&tmp_buffer, sizeof(uint64_t), cpf_bin_len);
+		if (res != 0) {
+			logger(LL_ERROR, "memalign failed (reason: %s)", strerror(res));
+			return -1;
+		}
+		if (tmp_buffer == NULL) {
+			logger(LL_ERROR, "Out of memory\n");
+			return -1;
+		}
+		memcpy(tmp_buffer, cpf_bin, cpf_bin_len);
+		gCPF = tmp_buffer;
+		gCPFLength = cpf_bin_len;
+		logger(LL_INFO, "Loaded embedded cpf module, length %zu\n", gCPFLength);
+	}
+	
+	// check pongo
+	{
+		logger(LL_INFO, "Checking Pongo image...\n");
+		int found = 0;
+		const uint64_t magicval = PONGO_MAGIC_VALUE; // 0x1337cafebabe4100uLL
+		uint8_t* cur = gPongoOS;
+		const uint8_t* end = (uint8_t*)(cur + gPongoOSLength - sizeof(uint64_t));
+		while (cur <= end) {
+			if (read_u64_le(cur) == magicval) {
+				found = 1;
+				break;
+			}
+			cur += sizeof(uint64_t);
+		}
+		if (found == 0) {
+			logger(LL_ERROR, "Incompatible Pongo image\n");
+			return -1;
+		}
+	}
+	
+	// check module flags
 	if (is_arm64_soc(client->cpid)) {
+		uint64_t kpf_flag = 0;
+		uint64_t cpf_flag = 0;
+		uint64_t sep_racer_flag = 0;
+		uint64_t ramdisk_flag = 0;
+		
+		logger(LL_INFO, "Loading image flags...\n");
+		
+		if (
+			load_rdsk_flag(
+						   (const uint8_t*)gRAMDisk,
+						   gRAMDiskLength,
+						   (rdsk_type & (RDSK_TYPE_UNION_IOS | RDSK_TYPE_UNION_TVOS)) ? 0x2222 : 0x1111,
+						   "RAMDisk.dmg",
+						   &ramdisk_flag
+						   )
+			)
+		{
+			return -2;
+		}
+		if (load_module_flag((const uint8_t*)gCPF, gCPFLength, 0xAAAA000000009990uLL, "cpf", &cpf_flag)) {
+			return -2;
+		}
+		if (load_module_flag((const uint8_t*)gKPF, gKPFLength, 0xBBBB000000009990uLL, "kpf", &kpf_flag)) {
+			return -2;
+		}
+		if (load_module_flag((const uint8_t*)gSEPRacer, gSEPRacerLength, 0xCCCC000000009990uLL, "sep_racer", &sep_racer_flag)) {
+			return -2;
+		}
+		client->kpf_flag = kpf_flag;
+		client->cpf_flag = cpf_flag;
+		client->sep_racer_flag = sep_racer_flag;
+		client->ramdisk_flag = ramdisk_flag;
+		
+		// check module compatibility
+		logger(LL_INFO, "Checking image flags...\n");
+		int module_unsupported = 0;
+		uint64_t vflag = convert_cpid_bdid_to_plat_vflag(client->cpid, client->bdid);
+		int is_tvos = is_tvos_with_cpid_bdid(client->cpid, client->bdid);
+		if (is_tvos == -1) {
+			logger(LL_ERROR, "Unknown bdid (BDID: 0x%02x)\n", (uint8_t)client->bdid);
+			module_unsupported = 1;
+		}
+		if (0 == check_vflag(client->ramdisk_flag, vflag)) {
+			logger(LL_DEBUG, "Found unsupported module (name: %s)\n", "RAMDisk.dmg");
+			module_unsupported = 1;
+		}
+		if (!is_a8_variant_soc(client->cpid)) {
+			if (0 == check_vflag(client->cpf_flag, vflag)) {
+				logger(LL_DEBUG, "Found unsupported module (name: %s)\n", "cpf");
+				module_unsupported = 1;
+			}
+		}
+		if (0 == check_vflag(client->kpf_flag, vflag)) {
+			logger(LL_DEBUG, "Found unsupported module (name: %s)\n", "kpf");
+			module_unsupported = 1;
+		}
+		if (0 == check_vflag(client->sep_racer_flag, vflag)) {
+			logger(LL_DEBUG, "Found unsupported module (name: %s)\n", "sep_racer");
+			module_unsupported = 1;
+		}
+		
+		if (module_unsupported) {
+			logger(LL_ERROR, "Unsupported device (CPID: %04x)\n", client->cpid);
+			return -2;
+		}
+		
+		// check bsep
+		if (client->get_shc_block || client->get_pte_block) {
+			if (is_a10_variant_soc(client->cpid)) {
+				logger(LL_ERROR, "This device does not requires SEP ciphertext block\n");
+				return -2;
+			}
+			if (client->get_shc_block && client->get_pte_block) {
+				logger(LL_ERROR, "Conflict detected\n");
+				return -2;
+			}
+		}
+		if (client->sep_shellcode_block && client->sep_shellcode_block_len) {
+			if (client->sep_shellcode_block_len == 0x80) {
+				logger(LL_INFO, "Found old style block!\n");
+				uint8_t zero[0x10] = { 0 };
+				memset(zero, 0, 0x10);
+				if (memcmp(client->sep_shellcode_block + 0x30, zero, 0x10) || memcmp(client->sep_shellcode_block + 0x70, zero, 0x10)) {
+					logger(LL_ERROR, "block type check failed!\n");
+					return -2;
+				}
+			}
+			else {
+				logger(LL_INFO, "Checking block type...\n");
+				bool _bsep_is_valid = 0;
+				sep_block_t* bsep = (sep_block_t*)client->sep_shellcode_block;
+				uint32_t myType = 0;
+				if (get_bsep_type(bsep, &myType) == false) {
+					logger(LL_ERROR, "block type check failed!\n");
+					return -2;
+				}
+				if (myType == BSEP_TYPE_SHC) {
+					if (client->sep_fwload_race) {
+						_bsep_is_valid = 1;
+					}
+				}
+				if (myType == BSEP_TYPE_PTE) {
+					if (client->sep_boot_tz0_race) {
+						_bsep_is_valid = 1;
+					}
+				}
+				if (!_bsep_is_valid) {
+					logger(LL_ERROR, "Invalid block type!\n");
+					return -2;
+				}
+			}
+		}
+		
 		if (client->flags & FLAG_TETHERED) {
+			logger(LL_INFO, "Checking image version flags...\n");
 			int is_tvos = is_tvos_with_cpid_bdid(client->cpid, client->bdid);
 			uint64_t vflag = convert_build_to_ios_vflag(client->build_major);
 			if (client->build_major >= 14) {
@@ -1308,37 +1460,15 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 					logger(LL_ERROR, "Found unsupported module (name: %s)\n", "kpf");
 					return -1;
 				}
-				if (client->build_major == 14 || client->build_major == 15) {
-					if (is_tvos == 0) { // iPhoneOS
-						if (0 == check_vflag(client->union_iphoneos_flag, vflag)) {
-							logger(LL_ERROR, "Found unsupported module (name: %s)\n", "union.dmg[iPhoneOS]");
-							return -1;
-						}
-					}
-					if (is_tvos == 1) { // tvOS
-						if (0 == check_vflag(client->union_tvos_flag, vflag)) {
-							logger(LL_ERROR, "Found unsupported module (name: %s)\n", "union.dmg[tvOS]");
-							return -1;
-						}
-					}
-				}
-				else {
-					if (is_tvos == 0) { // iPhoneOS
-						if (0 == check_vflag(client->overlay_iphoneos_flag, vflag)) {
-							logger(LL_ERROR, "Found unsupported module (name: %s)\n", "overlay.dmg[iPhoneOS]");
-							return -1;
-						}
-					}
-					if (is_tvos == 1) { // tvOS
-						if (0 == check_vflag(client->overlay_tvos_flag, vflag)) {
-							logger(LL_ERROR, "Found unsupported module (name: %s)\n", "overlay.dmg[tvOS]");
-							return -1;
-						}
-					}
+				if (0 == check_vflag(client->ramdisk_flag, vflag)) {
+					logger(LL_ERROR, "Found unsupported module (name: %s)\n", "RAMDisk.dmg");
+					return -1;
 				}
 			}
 		}
 	}
+	
+	logger(LL_DEBUG, "Found supported device (CPID: %04x)\n", client->cpid);
 #endif
 
 	client->image4supported = is_image4_supported(client);
@@ -3759,6 +3889,91 @@ int main(int argc, char* argv[])
 					usage(argc, argv, 1);
 					return EXIT_FAILURE;
 				}
+				break;
+				
+			case 32:
+				if (!*optarg) {
+					logger(LL_ERROR, "PATH argument for --override-kpf must not be empty!\n");
+					usage(argc, argv, 1);
+					return EXIT_FAILURE;
+				}
+				if (gKPF) {
+					free(gKPF);
+					gKPF = NULL;
+					gKPFLength = 0;
+				}
+				if (read_aligned_file_safe(optarg, (void**)&gKPF, &gKPFLength, 0x400000) != 0) {
+					return EXIT_FAILURE;
+				}
+				logger(LL_INFO, "Loaded custom KPF module, found at %s length %zu\n", optarg, gKPFLength);
+				break;
+				
+			case 33:
+				if (!*optarg) {
+					logger(LL_ERROR, "PATH argument for --override-cpf must not be empty!\n");
+					usage(argc, argv, 1);
+					return EXIT_FAILURE;
+				}
+				if (gCPF) {
+					free(gCPF);
+					gCPF = NULL;
+					gCPFLength = 0;
+				}
+				if (read_aligned_file_safe(optarg, (void**)&gCPF, &gCPFLength, 0x400000) != 0) {
+					return EXIT_FAILURE;
+				}
+				logger(LL_INFO, "Loaded custom CPF module, found at %s length %zu\n", optarg, gCPFLength);
+				break;
+				
+			case 34:
+				if (!*optarg) {
+					logger(LL_ERROR, "PATH argument for --override-sep-racer must not be empty!\n");
+					usage(argc, argv, 1);
+					return EXIT_FAILURE;
+				}
+				if (gSEPRacer) {
+					free(gSEPRacer);
+					gSEPRacer = NULL;
+					gSEPRacerLength = 0;
+				}
+				if (read_aligned_file_safe(optarg, (void**)&gSEPRacer, &gSEPRacerLength, 0x400000) != 0) {
+					return EXIT_FAILURE;
+				}
+				logger(LL_INFO, "Loaded custom sep_racer module, found at %s length %zu\n", optarg, gSEPRacerLength);
+				break;
+				
+			case 35:
+				if (!*optarg) {
+					logger(LL_ERROR, "PATH argument for --override-pongo must not be empty!\n");
+					usage(argc, argv, 1);
+					return EXIT_FAILURE;
+				}
+				if (gPongoOS) {
+					free(gPongoOS);
+					gPongoOS = NULL;
+					gPongoOSLength = 0;
+				}
+				if (read_aligned_file_safe(optarg, (void**)&gPongoOS, &gPongoOSLength, 0x100000) != 0) {
+					return EXIT_FAILURE;
+				}
+				logger(LL_INFO, "Loaded custom Pongo, found at %s length %zu\n", optarg, gPongoOSLength);
+				break;
+				
+			case 36:
+				if (!*optarg) {
+					logger(LL_ERROR, "PATH argument for --override-ramdisk must not be empty!\n");
+					usage(argc, argv, 1);
+					return EXIT_FAILURE;
+				}
+				if (gRAMDisk) {
+					free(gRAMDisk);
+					gRAMDisk = NULL;
+					gRAMDiskLength = 0;
+				}
+				if (read_aligned_file_safe(optarg, (void**)&gRAMDisk, &gRAMDiskLength, 0x800000) != 0) {
+					return EXIT_FAILURE;
+				}
+				logger(LL_INFO, "Loaded custom overlay ramdisk, found at %s length %zu\n", optarg, gRAMDiskLength);
 				break;
 #endif
 

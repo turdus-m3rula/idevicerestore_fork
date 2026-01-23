@@ -89,6 +89,7 @@ struct idevicerestore_mode_t {
 };
 
 #ifdef HAVE_TURDUS_MERULA
+#define PONGO_MAGIC_VALUE (0x1337cafebabe4100uLL)
 typedef struct {
 	char* alternative_hwmodel;
 	char* variant;
@@ -169,10 +170,7 @@ struct idevicerestore_client_t {
 	uint64_t kpf_flag;
 	uint64_t cpf_flag;
 	uint64_t sep_racer_flag;
-	uint64_t overlay_iphoneos_flag;
-	uint64_t overlay_tvos_flag;
-	uint64_t union_iphoneos_flag;
-	uint64_t union_tvos_flag;
+	uint64_t ramdisk_flag;
 	
 	// mark
 	int disable_serial_output;
