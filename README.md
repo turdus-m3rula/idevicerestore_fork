@@ -1,7 +1,7 @@
 # idevicerestore
 
 > [!NOTE]
-> Note: This is a fork of idevicerestore.  
+> This is a fork of idevicerestore.  
 
 *A command-line application to restore firmware files to iOS devices.*
 
@@ -138,6 +138,7 @@ tar -xvf resource.tar
   * [libimobiledevice](https://github.com/libimobiledevice/libimobiledevice)
   * [libirecovery](https://github.com/turdus-m3rula/libirecovery)
   * [libtatsu](https://github.com/libimobiledevice/libtatsu)
+  
   If you want to enable turdus merula, you also need the following dependency:
   * [libfragmentzip](https://github.com/turdus-m3rula/libfragmentzip)
 
