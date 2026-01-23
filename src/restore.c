@@ -1922,8 +1922,13 @@ memcpy(component_data, client->t_##name.im4p.data, component_size); \
 			logger(LL_ERROR, "Unable to extract component: %s\n", component);
 			return -1;
 		}
-
-		ret = personalize_component(client, component, component_data, component_size, client->tss, &personalized_data, &personalized_size);
+		plist_t sep_tss = client->tss;
+#ifdef HAVE_TURDUS_MERULA
+		if (client->flags & FLAG_TETHERED) {
+			sep_tss = client->rsep.tss;
+		}
+#endif
+		ret = personalize_component(client, component, component_data, component_size, sep_tss, &personalized_data, &personalized_size);
 		free(component_data);
 		component_data = NULL;
 		component_size = 0;
@@ -1948,10 +1953,11 @@ memcpy(component_data, client->t_##name.im4p.data, component_size); \
 			return -1;
 		}
 
-        plist_t sep_tss = client->tss;
+		plist_t sep_tss = client->tss;
 #ifdef HAVE_TURDUS_MERULA
 		// prevent iboot panic loop // TODO: better handle
 		if (client->flags & FLAG_TETHERED) {
+			sep_tss = client->rsep.tss;
 			if ((client->build_major >= 18) && have_arm64_single_stage_iboot(client->cpid)) { // A10+, iOS 14+
 				// This device doesn't use sep img4 on fs so it's fine anyway
 				if (client->rsep.data) {
@@ -1961,12 +1967,11 @@ memcpy(component_data, client->t_##name.im4p.data, component_size); \
 					component_size = client->rsep.length;
 					component_data = malloc(component_size);
 					memcpy(component_data, client->rsep.data, component_size);
-                    sep_tss = client->rsep.tss;
 				}
 			}
 		}
-		ret = personalize_component(client, component, component_data, component_size, client->tss, &personalized_data, &personalized_size);
 #endif
+		ret = personalize_component(client, component, component_data, component_size, sep_tss, &personalized_data, &personalized_size);
 		free(component_data);
 		component_data = NULL;
 		component_size = 0;
