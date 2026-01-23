@@ -1339,18 +1339,20 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 			
 			logger(LL_INFO, "Loading image flags...\n");
 			
-			if (
-				load_rdsk_flag(
-							   (const uint8_t*)gRAMDisk,
-							   gRAMDiskLength,
-							   (rdsk_type & (RDSK_TYPE_UNION_IOS | RDSK_TYPE_UNION_TVOS)) ? 0x2222 : 0x1111,
-							   "RAMDisk.dmg",
-							   &ramdisk_flag
-							   )
-				)
-			{
-				logger(LL_ERROR, "Image flag not found: %s\n", "RAMDisk.dmg");
-				return -2;
+			if (rdsk_type != 0) {
+				if (
+					load_rdsk_flag(
+								   (const uint8_t*)gRAMDisk,
+								   gRAMDiskLength,
+								   (rdsk_type & (RDSK_TYPE_UNION_IOS | RDSK_TYPE_UNION_TVOS)) ? 0x2222 : 0x1111,
+								   "RAMDisk.dmg",
+								   &ramdisk_flag
+								   )
+					)
+				{
+					logger(LL_ERROR, "Image flag not found: %s\n", "RAMDisk.dmg");
+					return -2;
+				}
 			}
 			if (load_module_flag((const uint8_t*)gCPF, gCPFLength, 0xAAAA000000009990uLL, "cpf", &cpf_flag)) {
 				logger(LL_ERROR, "Image flag not found: %s\n", "cpf");
@@ -1378,9 +1380,11 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 				logger(LL_ERROR, "Unknown bdid (BDID: 0x%02x)\n", (uint8_t)client->bdid);
 				module_unsupported = 1;
 			}
-			if (0 == check_vflag(client->ramdisk_flag, vflag)) {
-				logger(LL_ERROR, "Found unsupported module (name: %s)\n", "RAMDisk.dmg");
-				module_unsupported = 1;
+			if (rdsk_type != 0) {
+				if (0 == check_vflag(client->ramdisk_flag, vflag)) {
+					logger(LL_ERROR, "Found unsupported module (name: %s)\n", "RAMDisk.dmg");
+					module_unsupported = 1;
+				}
 			}
 			if (!is_a8_variant_soc(client->cpid)) {
 				if (0 == check_vflag(client->cpf_flag, vflag)) {
