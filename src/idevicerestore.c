@@ -2943,7 +2943,7 @@ logger(LL_DEBUG, "%s length: %zu\n", #name, client->t_##name.im4p.length); \
 		cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 100000000);
 #ifdef HAVE_TURDUS_MERULA
 		if ((client->flags & FLAG_DOWNGRADE) && is_arm64_soc(client->cpid)) {
-			plist_t my_tss;
+			plist_t my_tss = NULL;
 			// allocate image4 manifest
 			if (
 				(client->flags & FLAG_TETHERED) ||
@@ -2956,7 +2956,11 @@ logger(LL_DEBUG, "%s length: %zu\n", #name, client->t_##name.im4p.length); \
 				}
 				my_tss = client->rsep.tss;
 			}
-			else {
+			else if (
+					 !((client->flags & FLAG_FETCH_BSEP_SHC) == FLAG_FETCH_BSEP_SHC) &&
+					 !((client->flags & FLAG_LOAD_BSEP_SHC | FLAG_FETCH_BSEP_PTE) == FLAG_FETCH_BSEP_PTE)
+					 )
+			{
 				// use cached blob
 				if (!client->local_shsh) {
 					logger(LL_ERROR, "no local shsh buffer\n");
@@ -2965,64 +2969,66 @@ logger(LL_DEBUG, "%s length: %zu\n", #name, client->t_##name.im4p.length); \
 				my_tss = client->local_shsh;
 			}
 			
-			plist_t apimg4ticket_tss = plist_dict_get_item(my_tss, "ApImg4Ticket");
-			if (apimg4ticket_tss) {
-				uint64_t im4m_length = 0;
-				plist_get_data_val(apimg4ticket_tss, (char**)&client->sep.im4m.data, &im4m_length);
-				client->sep.im4m.length = (size_t)im4m_length;
-			}
-			if (!client->sep.im4m.data) {
-				logger(LL_ERROR, "no img4 manifest\n");
-				return -1;
-			}
-			
-			if (have_arm64_single_stage_iboot(client->cpid)) {
-				unsigned char tsha384[SHA384_DIGEST_LENGTH];
-				memset(tsha384, 0, SHA384_DIGEST_LENGTH);
-				sha384_context sha384ctx;
-				sha384_init(&sha384ctx);
-				sha384_update(&sha384ctx, client->sep.im4m.data, client->sep.im4m.length);
-				sha384_final(&sha384ctx, tsha384);
-				client->sep.mhash.length = SHA384_DIGEST_LENGTH;
-				client->sep.mhash.data = malloc(client->sep.mhash.length);
-				if (!client->sep.mhash.data) {
-					logger(LL_ERROR, "malloc failed\n");
+			if (my_tss) {
+				plist_t apimg4ticket_tss = plist_dict_get_item(my_tss, "ApImg4Ticket");
+				if (apimg4ticket_tss) {
+					uint64_t im4m_length = 0;
+					plist_get_data_val(apimg4ticket_tss, (char**)&client->sep.im4m.data, &im4m_length);
+					client->sep.im4m.length = (size_t)im4m_length;
+				}
+				if (!client->sep.im4m.data) {
+					logger(LL_ERROR, "no img4 manifest\n");
 					return -1;
 				}
-				memset(client->sep.mhash.data, 0, client->sep.mhash.length);
-				memcpy(client->sep.mhash.data, tsha384, SHA384_DIGEST_LENGTH);
-			}
-			else if (have_arm64_second_stage_iboot(client->cpid)) {
-				unsigned char tsha1[SHA1_DIGEST_LENGTH];
-				memset(tsha1, 0, SHA1_DIGEST_LENGTH);
-				sha1_context sha1ctx;
-				sha1_init(&sha1ctx);
-				sha1_update(&sha1ctx, client->sep.im4m.data, client->sep.im4m.length);
-				sha1_final(&sha1ctx, tsha1);
-				client->sep.mhash.length = SHA1_DIGEST_LENGTH;
-				client->sep.mhash.data = malloc(client->sep.mhash.length);
-				if (!client->sep.mhash.data) {
-					logger(LL_ERROR, "malloc failed\n");
+				
+				if (have_arm64_single_stage_iboot(client->cpid)) {
+					unsigned char tsha384[SHA384_DIGEST_LENGTH];
+					memset(tsha384, 0, SHA384_DIGEST_LENGTH);
+					sha384_context sha384ctx;
+					sha384_init(&sha384ctx);
+					sha384_update(&sha384ctx, client->sep.im4m.data, client->sep.im4m.length);
+					sha384_final(&sha384ctx, tsha384);
+					client->sep.mhash.length = SHA384_DIGEST_LENGTH;
+					client->sep.mhash.data = malloc(client->sep.mhash.length);
+					if (!client->sep.mhash.data) {
+						logger(LL_ERROR, "malloc failed\n");
+						return -1;
+					}
+					memset(client->sep.mhash.data, 0, client->sep.mhash.length);
+					memcpy(client->sep.mhash.data, tsha384, SHA384_DIGEST_LENGTH);
+				}
+				else if (have_arm64_second_stage_iboot(client->cpid)) {
+					unsigned char tsha1[SHA1_DIGEST_LENGTH];
+					memset(tsha1, 0, SHA1_DIGEST_LENGTH);
+					sha1_context sha1ctx;
+					sha1_init(&sha1ctx);
+					sha1_update(&sha1ctx, client->sep.im4m.data, client->sep.im4m.length);
+					sha1_final(&sha1ctx, tsha1);
+					client->sep.mhash.length = SHA1_DIGEST_LENGTH;
+					client->sep.mhash.data = malloc(client->sep.mhash.length);
+					if (!client->sep.mhash.data) {
+						logger(LL_ERROR, "malloc failed\n");
+						return -1;
+					}
+					memset(client->sep.mhash.data, 0, client->sep.mhash.length);
+					memcpy(client->sep.mhash.data, tsha1, SHA1_DIGEST_LENGTH);
+				}
+				else {
+					logger(LL_ERROR, "Found unknown device\n");
 					return -1;
 				}
-				memset(client->sep.mhash.data, 0, client->sep.mhash.length);
-				memcpy(client->sep.mhash.data, tsha1, SHA1_DIGEST_LENGTH);
+				if (!client->sep.mhash.data) {
+					logger(LL_ERROR, "no img4 manifest hash\n");
+					return -1;
+				}
+				
+				uint8_t* _manifest_hash = (uint8_t*)client->sep.mhash.data;
+				fprintf(stderr, "img4 manifest hash: ");
+				for (int i = 0; i < client->sep.mhash.length; i++) {
+					fprintf(stderr, "%02x", _manifest_hash[i]);
+				}
+				fprintf(stderr, "\n");
 			}
-			else {
-				logger(LL_ERROR, "Found unknown device\n");
-				return -1;
-			}
-			if (!client->sep.mhash.data) {
-				logger(LL_ERROR, "no img4 manifest hash\n");
-				return -1;
-			}
-			
-			uint8_t* _manifest_hash = (uint8_t*)client->sep.mhash.data;
-			fprintf(stderr, "img4 manifest hash: ");
-			for (int i = 0; i < client->sep.mhash.length; i++) {
-				fprintf(stderr, "%02x", _manifest_hash[i]);
-			}
-			fprintf(stderr, "\n");
 			
 			if (client->mode == MODE_DFU) {
 				if (dfu_get_yolo_checkra1n(client) == 0) {
@@ -4371,7 +4377,7 @@ int get_tss_response(struct idevicerestore_client_t* client, plist_t build_ident
 				logger(LL_INFO, "Using cached SHSH\n");
 				return 0;
 			}
-			else if ((client->flags & FLAG_TETHERED) || (client->flags & FLAG_FETCH_BSEP_SHC)) {
+			else if ((client->flags & FLAG_TETHERED) || (client->flags & FLAG_FETCH_BSEP)) {
 				if (client->base.tss) {
 					*tss = plist_copy(client->base.tss);
 					logger(LL_INFO, "Using cached SHSH\n");
