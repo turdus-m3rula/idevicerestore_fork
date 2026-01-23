@@ -116,7 +116,7 @@ static int lz4_compress_and_add_shc(const void *inbuf, const size_t insize, void
 	return 0;
 }
 
-static void patch_pongo(uint8_t* pongo, const size_t sz, int sigcheckPatch)
+static int patch_pongo(uint8_t* pongo, const size_t sz, int sigcheckPatch)
 {
 	const uint64_t magicval = 0x1337cafebabe4100uLL;
 	uint64_t ipf_flag = IPF_NONE;
@@ -128,10 +128,11 @@ static void patch_pongo(uint8_t* pongo, const size_t sz, int sigcheckPatch)
 	while (cur <= end) {
 		if (read_u64_le(cur) == magicval) {
 			write_u64_le(cur, ipf_flag);
-			break;
+			return 0;
 		}
 		cur += sizeof(uint64_t);
 	}
+	return -1;
 }
 
 int send_pongo_image(struct idevicerestore_client_t* client)
@@ -158,7 +159,10 @@ int send_pongo_image(struct idevicerestore_client_t* client)
 	memset(pongoRawImage, 0, pongoRawSize);
 	memcpy(pongoRawImage, &Pongo_bin, pongoRawSize);
 	
-	patch_pongo(pongoRawImage, pongoRawSize, 1);
+	if (patch_pongo(pongoRawImage, pongoRawSize, 1)) {
+		logger(LL_ERROR, "Magic not found\n");
+		return -1;
+	}
 	
 	if (lz4_compress_and_add_shc(pongoRawImage, pongoRawSize, (void*)&PongoImage, &PongoSize)) {
 		logger(LL_ERROR, "lz4 failed\n");
