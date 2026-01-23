@@ -62,6 +62,8 @@
 #include "locking.h"
 
 #ifdef HAVE_TURDUS_MERULA
+#include <usbmuxd.h>
+#include <zip.h>
 #include <libfragmentzip/libfragmentzip.h>
 #include "turdus/merula.h"
 #include "turdus/pongo.h"
@@ -3462,7 +3464,21 @@ int main(int argc, char* argv[])
 			break;
 
 		case 'v':
+#ifdef HAVE_TURDUS_MERULA
+                printf("turdus_merula[%s] version: %s\n", PACKAGE_NAME, PACKAGE_VERSION);
+                printf("Library version\n");
+                printf("- %s: %s\n", "libirecovery", irecv_version());
+                printf("- %s: %s\n", "libtatsu", libtatsu_version());
+                printf("- %s: %s\n", "libusbmuxd", libusbmuxd_version());
+                printf("- %s: %s\n", "libplist", libplist_version());
+                printf("- %s: %s\n", "libimobiledevice_glue", libimobiledevice_glue_version());
+                printf("- %s: %s\n", "libimobiledevice", libimobiledevice_version());
+                printf("- %s: %s\n", "libfragmentzip", fragmentzip_version());
+                printf("- %s: %s\n", "libzip", zip_libzip_version());
+                printf("- %s: %s\n", "libcurl", curl_version());
+#else
 			printf("%s %s (libirecovery %s, libtatsu %s)\n", PACKAGE_NAME, PACKAGE_VERSION, irecv_version(), libtatsu_version());
+#endif
 			return EXIT_SUCCESS;
 
 		case 'T': {
