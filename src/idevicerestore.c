@@ -1795,15 +1795,17 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 		}
 		
 		// RSEP
-		if (
-			is_a10_variant_soc(client->cpid) ||    // A10 variant
-			(client->flags & FLAG_LOAD_BSEP_SHC) || // do fwload race
-			(client->flags & FLAG_TETHERED)        // tethered
-			)
-		{
-			fw_component_flag |= USE_SIGNED_RSEP;
-			if (client->rsep.data && client->rsep.length && client->rsep.manifest) {
-				specific_fw_component_flag |= USE_SIGNED_RSEP;
+		if (is_arm64_soc(client->cpid)) {
+			if (
+				is_a10_variant_soc(client->cpid) ||    // A10 variant
+				(client->flags & FLAG_LOAD_BSEP_SHC) || // do fwload race
+				(client->flags & FLAG_TETHERED)        // tethered
+				)
+			{
+				fw_component_flag |= USE_SIGNED_RSEP;
+				if (client->rsep.data && client->rsep.length && client->rsep.manifest) {
+					specific_fw_component_flag |= USE_SIGNED_RSEP;
+				}
 			}
 		}
 		
