@@ -71,8 +71,8 @@ idevicerestore_SOURCES += \
 	stuff/Pongo_bin.c stuff/Pongo_bin.h \
 	stuff/sep_racer_bin.c stuff/sep_racer_bin.h \
 	stuff/union_iphoneos_bin.c stuff/union_tvos_bin.c stuff/union_bin.h
-idevicerestore_CFLAGS += -DHAVE_TURDUS_MERULA $(libDER_CFLAGS) $(libfragmentzip_CFLAGS)
-idevicerestore_LDFLAGS += $(libfragmentzip_LIBS)
+idevicerestore_CFLAGS += -DHAVE_TURDUS_MERULA $(libDER_CFLAGS) $(libfragmentzip_CFLAGS) $(libzstd_CFLAGS)
+idevicerestore_LDFLAGS += $(libfragmentzip_LIBS) $(libzstd_LIBS)
 endif
 if HAVE_LIBHFSPLUS
 idevicerestore_SOURCES += \

@@ -30,6 +30,8 @@
 #endif
 
 #include <zlib.h>
+#include <zstd.h>
+
 #include "../common.h"
 #include "../endianness.h"
 #include "../dfu.h"
@@ -58,6 +60,35 @@ size_t gCPFLength = 0;
 
 void* gRAMDisk = NULL;
 size_t gRAMDiskLength = 0;
+
+#pragma mark - zstd
+int decompress_zstd_buffer(const void* srcbuf, size_t srclen, size_t maxlen, void** outbuf, size_t* outlen)
+{
+	if (!srcbuf || !outbuf || !outlen || srclen == 0 || maxlen == 0) {
+		return -1;
+	}
+	*outbuf = NULL;
+	*outlen = 0;
+	unsigned long long const dstcap = ZSTD_getFrameContentSize(srcbuf, srclen);
+	if (dstcap == ZSTD_CONTENTSIZE_ERROR || dstcap == ZSTD_CONTENTSIZE_UNKNOWN) {
+		return -1;
+	}
+	if ((size_t)dstcap > maxlen) {
+		return -1;
+	}
+	void* const dstbuf = malloc((size_t)dstcap);
+	if (!dstbuf) {
+		return -1;
+	}
+	size_t const dlen = ZSTD_decompress(dstbuf, (size_t)dstcap, srcbuf, srclen);
+	if (ZSTD_isError(dlen)) {
+		free(dstbuf);
+		return -1;
+	}
+	*outbuf = dstbuf;
+	*outlen = dlen;
+	return 0;
+}
 
 #pragma mark - common
 int read_aligned_file_safe(const char* filename, void** data, size_t* size, size_t max_size)
@@ -179,7 +210,7 @@ int read_file_safe(const char* filename, void** data, size_t* size, size_t max_s
 	return 0;
 }
 
-void print_module_hash(const char* name, const uint8_t* buf, const size_t length)
+void print_module_hash(const char* name, const char* type, const uint8_t* buf, const size_t length)
 {
 	unsigned char tsha384[SHA384_DIGEST_LENGTH];
 	memset(tsha384, 0, SHA384_DIGEST_LENGTH);
@@ -188,11 +219,10 @@ void print_module_hash(const char* name, const uint8_t* buf, const size_t length
 	sha384_update(&sha384ctx, buf, length);
 	sha384_final(&sha384ctx, tsha384);
 	
-	printf("%s hash: ", name);
 	for (int i = 0; i < SHA384_DIGEST_LENGTH; i++) {
 		printf("%02x", tsha384[i]);
 	}
-	printf("\n");
+	printf(" = SHA384(%s.%s) hash (%zu bytes)\n", name, type, length);
 }
 
 uint32_t read_u32_le(const uint8_t *p)

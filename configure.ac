@@ -24,6 +24,7 @@ LIBTATSU_VERSION=1.0.4
 LIBZIP_VERSION=1.0
 LIBCURL_VERSION=7.0
 LIBFRAGMENTZIP_VERSION=54
+ZSTD_VERSION=1.5.7
 
 AC_SUBST(LIBIRECOVERY_VERSION)
 AC_SUBST(LIBIMOBILEDEVICE_VERSION)
@@ -169,7 +170,9 @@ AC_ARG_WITH([turdusmerula],
 if test "x$have_turdusmerula" = "xyes"; then
   AC_DEFINE(HAVE_TURDUS_MERULA, 1, [Define if turdus merula support is available])
   AC_SUBST(LIBFRAGMENTZIP_VERSION)
+  AC_SUBST(ZSTD_VERSION)
   PKG_CHECK_MODULES(libfragmentzip, libfragmentzip >= $LIBFRAGMENTZIP_VERSION)
+  PKG_CHECK_MODULES(libzstd, libzstd >= $ZSTD_VERSION)
 fi
 AM_CONDITIONAL([HAVE_TURDUS_MERULA],[test "x$have_turdusmerula" = "xyes"])
 

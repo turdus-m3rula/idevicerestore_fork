@@ -1202,30 +1202,44 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 			if (rdsk_type != 0) {
 				if (gRAMDisk == NULL) {
 					logger(LL_INFO, "Loading overlay ramdisk...\n");
-					unsigned int ramdisk_length = 0;
+					size_t ramdisk_length = 0;
 					void* ramdisk_buffer = NULL;
 					if (rdsk_type & RDSK_TYPE_UNION_IOS) {
-						ramdisk_buffer = union_iphoneos_bin;
-						ramdisk_length = union_iphoneos_bin_len;
+						ramdisk_buffer = (void *)union_iphoneos_bin;
+						ramdisk_length = (size_t)union_iphoneos_bin_len;
 					}
 					else if (rdsk_type & RDSK_TYPE_UNION_TVOS) {
-						ramdisk_buffer = union_tvos_bin;
-						ramdisk_length = union_tvos_bin_len;
+						ramdisk_buffer = (void *)union_tvos_bin;
+						ramdisk_length = (size_t)union_tvos_bin_len;
 					}
 					else if (rdsk_type & RDSK_TYPE_DYLDHOOK_IOS) {
-						ramdisk_buffer = overlay_iphoneos_bin;
-						ramdisk_length = overlay_iphoneos_bin_len;
+						ramdisk_buffer = (void *)overlay_iphoneos_bin;
+						ramdisk_length = (size_t)overlay_iphoneos_bin_len;
 					}
 					else if (rdsk_type & RDSK_TYPE_DYLDHOOK_TVOS) {
-						ramdisk_buffer = overlay_tvos_bin;
-						ramdisk_length = overlay_tvos_bin_len;
+						ramdisk_buffer = (void *)overlay_tvos_bin;
+						ramdisk_length = (size_t)overlay_tvos_bin_len;
 					}
 					else {
 						logger(LL_ERROR, "Invalid rdsk_type\n");
 						return -1;
 					}
+					
+					void* rdsk_raw_buffer = NULL;
+					size_t rdsk_raw_length = 0;
+					int _rv = decompress_zstd_buffer((const void *)ramdisk_buffer, (const size_t)ramdisk_length, (size_t)MAX_RAMDISK_SIZE, &rdsk_raw_buffer, &rdsk_raw_length);
+					ramdisk_buffer = NULL;
+					if (_rv != 0) {
+						logger(LL_ERROR, "Decompress failed\n");
+						return -1;
+					}
+					if (rdsk_raw_buffer == NULL) {
+						logger(LL_ERROR, "Out of memory?\n");
+						return -1;
+					}
+					
 					void* tmp_buffer = NULL;
-					int res = posix_memalign(&tmp_buffer, sizeof(uint64_t), ramdisk_length);
+					int res = posix_memalign(&tmp_buffer, sizeof(uint64_t), rdsk_raw_length);
 					if (res != 0) {
 						logger(LL_ERROR, "memalign failed (reason: %s)", strerror(res));
 						return -1;
@@ -1234,9 +1248,11 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 						logger(LL_ERROR, "Out of memory\n");
 						return -1;
 					}
-					memcpy(tmp_buffer, ramdisk_buffer, ramdisk_length);
+					memcpy(tmp_buffer, rdsk_raw_buffer, rdsk_raw_length);
+					free(rdsk_raw_buffer);
+					
 					gRAMDisk = tmp_buffer;
-					gRAMDiskLength = ramdisk_length;
+					gRAMDiskLength = rdsk_raw_length;
 					logger(LL_INFO, "Loaded embedded overlay ramdisk, length %zu\n", gRAMDiskLength);
 				}
 			}
@@ -1244,70 +1260,133 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 			// load module and pongo
 			if (gPongoOS == NULL) {
 				logger(LL_INFO, "Loading Pongo...\n");
+				void* pongo_raw_buffer = NULL;
+				size_t pongo_raw_length = 0;
+				if (decompress_zstd_buffer((const void *)Pongo_bin, (const size_t)Pongo_bin_len, (size_t)MAX_PONGO_SIZE, &pongo_raw_buffer, &pongo_raw_length) != 0) {
+					logger(LL_ERROR, "Decompress failed\n");
+					return -1;
+				}
+				if (pongo_raw_buffer == NULL) {
+					logger(LL_ERROR, "Out of memory?\n");
+					return -1;
+				}
+				
 				void* tmp_buffer = NULL;
-				int res = posix_memalign(&tmp_buffer, sizeof(uint64_t), Pongo_bin_len);
+				int res = posix_memalign(&tmp_buffer, sizeof(uint64_t), pongo_raw_length);
 				if (res != 0) {
 					logger(LL_ERROR, "memalign failed (reason: %s)", strerror(res));
+					free(pongo_raw_buffer);
 					return -1;
 				}
 				if (tmp_buffer == NULL) {
 					logger(LL_ERROR, "Out of memory\n");
+					free(pongo_raw_buffer);
 					return -1;
 				}
-				memcpy(tmp_buffer, Pongo_bin, Pongo_bin_len);
+				memcpy(tmp_buffer, pongo_raw_buffer, pongo_raw_length);
+				free(pongo_raw_buffer);
+				
 				gPongoOS = tmp_buffer;
-				gPongoOSLength = Pongo_bin_len;
+				gPongoOSLength = pongo_raw_length;
 				logger(LL_INFO, "Loaded embedded Pongo, length %zu\n", gPongoOSLength);
 			}
+			
 			if (gSEPRacer == NULL) {
 				logger(LL_INFO, "Loading sep_racer...\n");
+				void* sepracer_raw_buffer = NULL;
+				size_t sepracer_raw_length = 0;
+				if (decompress_zstd_buffer((const void *)sep_racer_bin, (const size_t)sep_racer_bin_len, (size_t)MAX_MODULE_SIZE, &sepracer_raw_buffer, &sepracer_raw_length) != 0) {
+					logger(LL_ERROR, "Decompress failed\n");
+					return -1;
+				}
+				if (sepracer_raw_buffer == NULL) {
+					logger(LL_ERROR, "Out of memory?\n");
+					return -1;
+				}
+				
 				void* tmp_buffer = NULL;
-				int res = posix_memalign(&tmp_buffer, sizeof(uint64_t), sep_racer_bin_len);
+				int res = posix_memalign(&tmp_buffer, sizeof(uint64_t), sepracer_raw_length);
 				if (res != 0) {
 					logger(LL_ERROR, "memalign failed (reason: %s)", strerror(res));
+					free(sepracer_raw_buffer);
 					return -1;
 				}
 				if (tmp_buffer == NULL) {
 					logger(LL_ERROR, "Out of memory\n");
+					free(sepracer_raw_buffer);
 					return -1;
 				}
-				memcpy(tmp_buffer, sep_racer_bin, sep_racer_bin_len);
+				memcpy(tmp_buffer, sepracer_raw_buffer, sepracer_raw_length);
+				free(sepracer_raw_buffer);
+				
 				gSEPRacer = tmp_buffer;
-				gSEPRacerLength = sep_racer_bin_len;
+				gSEPRacerLength = sepracer_raw_length;
 				logger(LL_INFO, "Loaded embedded sep_racer module, length %zu\n", gSEPRacerLength);
 			}
+			
 			if (gKPF == NULL) {
 				logger(LL_INFO, "Loading kpf...\n");
+				void* kpf_raw_buffer = NULL;
+				size_t kpf_raw_length = 0;
+				if (decompress_zstd_buffer((const void *)kpf_bin, (const size_t)kpf_bin_len, (size_t)MAX_MODULE_SIZE, &kpf_raw_buffer, &kpf_raw_length) != 0) {
+					logger(LL_ERROR, "Decompress failed\n");
+					return -1;
+				}
+				if (kpf_raw_buffer == NULL) {
+					logger(LL_ERROR, "Out of memory?\n");
+					return -1;
+				}
+				
 				void* tmp_buffer = NULL;
-				int res = posix_memalign(&tmp_buffer, sizeof(uint64_t), kpf_bin_len);
+				int res = posix_memalign(&tmp_buffer, sizeof(uint64_t), kpf_raw_length);
 				if (res != 0) {
 					logger(LL_ERROR, "memalign failed (reason: %s)", strerror(res));
+					free(kpf_raw_buffer);
 					return -1;
 				}
 				if (tmp_buffer == NULL) {
 					logger(LL_ERROR, "Out of memory\n");
+					free(kpf_raw_buffer);
 					return -1;
 				}
-				memcpy(tmp_buffer, kpf_bin, kpf_bin_len);
+				memcpy(tmp_buffer, kpf_raw_buffer, kpf_raw_length);
+				free(kpf_raw_buffer);
+				
 				gKPF = tmp_buffer;
-				gKPFLength = kpf_bin_len;
+				gKPFLength = kpf_raw_length;
 				logger(LL_INFO, "Loaded embedded kpf module, length %zu\n", gKPFLength);
 			}
+			
 			if (gCPF == NULL) {
 				logger(LL_INFO, "Loading cpf...\n");
+				void* cpf_raw_buffer = NULL;
+				size_t cpf_raw_length = 0;
+				if (decompress_zstd_buffer((const void *)cpf_bin, (const size_t)cpf_bin_len, (size_t)MAX_MODULE_SIZE, &cpf_raw_buffer, &cpf_raw_length) != 0) {
+					logger(LL_ERROR, "Decompress failed\n");
+					return -1;
+				}
+				if (cpf_raw_buffer == NULL) {
+					logger(LL_ERROR, "Out of memory?\n");
+					return -1;
+				}
+				
 				void* tmp_buffer = NULL;
-				int res = posix_memalign(&tmp_buffer, sizeof(uint64_t), cpf_bin_len);
+				int res = posix_memalign(&tmp_buffer, sizeof(uint64_t), cpf_raw_length);
 				if (res != 0) {
 					logger(LL_ERROR, "memalign failed (reason: %s)", strerror(res));
+					free(cpf_raw_buffer);
 					return -1;
 				}
 				if (tmp_buffer == NULL) {
 					logger(LL_ERROR, "Out of memory\n");
+					free(cpf_raw_buffer);
 					return -1;
 				}
-				memcpy(tmp_buffer, cpf_bin, cpf_bin_len);
+				memcpy(tmp_buffer, cpf_raw_buffer, cpf_raw_length);
+				free(cpf_raw_buffer);
+				
 				gCPF = tmp_buffer;
-				gCPFLength = cpf_bin_len;
+				gCPFLength = cpf_raw_length;
 				logger(LL_INFO, "Loaded embedded cpf module, length %zu\n", gCPFLength);
 			}
 			
@@ -3916,14 +3995,36 @@ int main(int argc, char* argv[])
 				break;
 				
 			case 30:
-				print_module_hash("Pongo.bin", Pongo_bin, Pongo_bin_len);
-				print_module_hash("cpf", cpf_bin, cpf_bin_len);
-				print_module_hash("kpf", kpf_bin, kpf_bin_len);
-				print_module_hash("sep_racer", sep_racer_bin, sep_racer_bin_len);
-				print_module_hash("overlay.dmg[iPhoneOS]", overlay_iphoneos_bin, overlay_iphoneos_bin_len);
-				print_module_hash("overlay.dmg[tvOS]", overlay_tvos_bin, overlay_tvos_bin_len);
-				print_module_hash("union.dmg[iPhoneOS]", union_iphoneos_bin, union_iphoneos_bin_len);
-				print_module_hash("union.dmg[tvOS]", union_tvos_bin, union_tvos_bin_len);
+				printf("Embedded modules hashes [compressed]:\n");
+				print_module_hash("Pongo.bin", "zstd", Pongo_bin, Pongo_bin_len);
+				print_module_hash("cpf.bin", "zstd", cpf_bin, cpf_bin_len);
+				print_module_hash("kpf.bin", "zstd", kpf_bin, kpf_bin_len);
+				print_module_hash("sep_racer.bin", "zstd", sep_racer_bin, sep_racer_bin_len);
+				print_module_hash("iPhoneOS_overlay.dmg", "zstd", overlay_iphoneos_bin, overlay_iphoneos_bin_len);
+				print_module_hash("tvOS_overlay.dmg", "zstd", overlay_tvos_bin, overlay_tvos_bin_len);
+				print_module_hash("iPhoneOS_union.dmg", "zstd", union_iphoneos_bin, union_iphoneos_bin_len);
+				print_module_hash("tvOS_union.dmg", "zstd", union_tvos_bin, union_tvos_bin_len);
+#define PRINT_MODULE_HASH_UNZSTD(name, srcb, srcl, maxl) do { \
+void *_dstb = NULL; \
+size_t _dstl = 0; \
+if (decompress_zstd_buffer((const void *)(srcb), (const size_t)(srcl), (size_t)(maxl), &_dstb, &_dstl) != 0) { \
+logger(LL_ERROR, "Decompress failed: %s\n", (name)); \
+} \
+if (_dstb == NULL) { \
+logger(LL_ERROR, "Out of memory?: %s\n", (name)); \
+} \
+print_module_hash((name), "raw", _dstb, _dstl); \
+if (_dstb) free(_dstb); \
+} while (0);
+				printf("Embedded modules hashes [decompressed]:\n");
+				PRINT_MODULE_HASH_UNZSTD("Pongo.bin", Pongo_bin, Pongo_bin_len, MAX_PONGO_SIZE);
+				PRINT_MODULE_HASH_UNZSTD("cpf.bin", cpf_bin, cpf_bin_len, MAX_MODULE_SIZE);
+				PRINT_MODULE_HASH_UNZSTD("kpf.bin", kpf_bin, kpf_bin_len, MAX_MODULE_SIZE);
+				PRINT_MODULE_HASH_UNZSTD("sep_racer.bin", sep_racer_bin, sep_racer_bin_len, MAX_MODULE_SIZE);
+				PRINT_MODULE_HASH_UNZSTD("iPhoneOS_overlay.dmg", overlay_iphoneos_bin, overlay_iphoneos_bin_len, MAX_RAMDISK_SIZE);
+				PRINT_MODULE_HASH_UNZSTD("tvOS_overlay.dmg", overlay_tvos_bin, overlay_tvos_bin_len, MAX_RAMDISK_SIZE);
+				PRINT_MODULE_HASH_UNZSTD("iPhoneOS_union.dmg", union_iphoneos_bin, union_iphoneos_bin_len, MAX_RAMDISK_SIZE);
+				PRINT_MODULE_HASH_UNZSTD("tvOS_union.dmg", union_tvos_bin, union_tvos_bin_len, MAX_RAMDISK_SIZE);
 				return EXIT_SUCCESS;
 				
 			case 31:
@@ -3965,7 +4066,7 @@ int main(int argc, char* argv[])
 					gKPF = NULL;
 					gKPFLength = 0;
 				}
-				if (read_aligned_file_safe(optarg, (void**)&gKPF, &gKPFLength, 0x400000) != 0) {
+				if (read_aligned_file_safe(optarg, (void**)&gKPF, &gKPFLength, MAX_MODULE_SIZE) != 0) {
 					return EXIT_FAILURE;
 				}
 				logger(LL_INFO, "Loaded custom KPF module, found at %s length %zu\n", optarg, gKPFLength);
@@ -3982,7 +4083,7 @@ int main(int argc, char* argv[])
 					gCPF = NULL;
 					gCPFLength = 0;
 				}
-				if (read_aligned_file_safe(optarg, (void**)&gCPF, &gCPFLength, 0x400000) != 0) {
+				if (read_aligned_file_safe(optarg, (void**)&gCPF, &gCPFLength, MAX_MODULE_SIZE) != 0) {
 					return EXIT_FAILURE;
 				}
 				logger(LL_INFO, "Loaded custom CPF module, found at %s length %zu\n", optarg, gCPFLength);
@@ -3999,7 +4100,7 @@ int main(int argc, char* argv[])
 					gSEPRacer = NULL;
 					gSEPRacerLength = 0;
 				}
-				if (read_aligned_file_safe(optarg, (void**)&gSEPRacer, &gSEPRacerLength, 0x400000) != 0) {
+				if (read_aligned_file_safe(optarg, (void**)&gSEPRacer, &gSEPRacerLength, MAX_MODULE_SIZE) != 0) {
 					return EXIT_FAILURE;
 				}
 				logger(LL_INFO, "Loaded custom sep_racer module, found at %s length %zu\n", optarg, gSEPRacerLength);
@@ -4016,7 +4117,7 @@ int main(int argc, char* argv[])
 					gPongoOS = NULL;
 					gPongoOSLength = 0;
 				}
-				if (read_aligned_file_safe(optarg, (void**)&gPongoOS, &gPongoOSLength, 0x100000) != 0) {
+				if (read_aligned_file_safe(optarg, (void**)&gPongoOS, &gPongoOSLength, MAX_PONGO_SIZE) != 0) {
 					return EXIT_FAILURE;
 				}
 				logger(LL_INFO, "Loaded custom Pongo, found at %s length %zu\n", optarg, gPongoOSLength);
@@ -4033,7 +4134,7 @@ int main(int argc, char* argv[])
 					gRAMDisk = NULL;
 					gRAMDiskLength = 0;
 				}
-				if (read_aligned_file_safe(optarg, (void**)&gRAMDisk, &gRAMDiskLength, 0x800000) != 0) {
+				if (read_aligned_file_safe(optarg, (void**)&gRAMDisk, &gRAMDiskLength, MAX_RAMDISK_SIZE) != 0) {
 					return EXIT_FAILURE;
 				}
 				logger(LL_INFO, "Loaded custom overlay ramdisk, found at %s length %zu\n", optarg, gRAMDiskLength);

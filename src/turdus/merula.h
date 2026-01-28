@@ -11,6 +11,10 @@
 
 #include "../common.h"
 
+#define MAX_RAMDISK_SIZE (0x800000)
+#define MAX_MODULE_SIZE  (0x400000)
+#define MAX_PONGO_SIZE   (0x100000)
+
 typedef struct {
 	uint32_t magic;         // 'bsep'
 	uint32_t total_size;    // total block size
@@ -89,10 +93,13 @@ size_t gCPFLength;
 void* gRAMDisk;
 size_t gRAMDiskLength;
 
+#pragma mark - zstd
+int decompress_zstd_buffer(const void* srcbuf, size_t srclen, size_t maxlen, void** outbuf, size_t* outlen);
+
 #pragma mark - common
 int read_aligned_file_safe(const char* filename, void** data, size_t* size, size_t max_size);
 int read_file_safe(const char* filename, void** data, size_t* size, size_t max_size);
-void print_module_hash(const char* name, const uint8_t* buf, const size_t length);
+void print_module_hash(const char* name, const char* type, const uint8_t* buf, const size_t length);
 uint32_t read_u32_le(const uint8_t *p);
 uint64_t read_u64_le(const unsigned char *p);
 void write_u32_le(uint8_t *buf, uint32_t value);
