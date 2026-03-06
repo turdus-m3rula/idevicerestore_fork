@@ -2356,7 +2356,9 @@ logger(LL_DEBUG, "%s length: %zu\n", #name, client->t_##name.im4p.length); \
 			if (
 				strncmp(client->version, "26.0", 4) == 0 ||
 				strncmp(client->version, "26.1", 4) == 0 ||
-				strncmp(client->version, "26.2", 4) == 0
+				strncmp(client->version, "26.2", 4) == 0 ||
+				strncmp(client->version, "26.3", 4) == 0 ||
+				strncmp(client->version, "26.4", 4) == 0
 				)
 			{
 				is_supported_version = 1;
