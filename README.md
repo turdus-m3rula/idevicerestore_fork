@@ -5,15 +5,11 @@
 
 *A command-line application to restore firmware files to iOS devices.*
 
-![](https://github.com/libimobiledevice/idevicerestore/actions/workflows/build.yml/badge.svg)
-
 ## Table of Contents
 - [Features](#features)
 - [Building](#building)
   - [Prerequisites](#prerequisites)
-    - [Linux (Debian/Ubuntu based)](#linux-debianubuntu-based)
     - [macOS](#macos)
-    - [Windows](#windows)
   - [Configuring the source tree](#configuring-the-source-tree)
   - [Building and installation](#building-and-installation)
 - [Usage](#usage)
@@ -70,53 +66,12 @@ tar -xvf resource.tar
 ./gen.sh
 ```
 
-#### Linux (Debian/Ubuntu based)
-
-* Install all required dependencies and build tools:
-  ```shell
-  sudo apt-get install \
-  	build-essential \
-  	pkg-config \
-  	checkinstall \
-  	git \
-  	autoconf \
-  	automake \
-  	libtool-bin \
-  	libreadline-dev \
-  	libusb-1.0-0-dev \
-  	libplist-dev \
-  	libimobiledevice-dev \
-  	libimobiledevice-glue-dev \
-  	libtatsu-dev \
-  	libcurl4-openssl-dev \
-  	libssl-dev \
-  	libzip-dev \
-  	zlib1g-dev
-  ```
-  NOTE: [libtatsu](https://github.com/libimobiledevice/libtatsu) (and thus `libtatsu-dev`)
-  is a new library that was just published recently, you have to
-  [build it from source](https://github.com/libimobiledevice/libtatsu?tab=readme-ov-file#building).
-  Also, other `*-dev` packages might not be available for your distribution,
-  so you will have to build these packages on your own as well.
 
 #### macOS
 
 * Make sure the Xcode command line tools are installed.
 
-  **Option 1**:
-  The easiest way to build and install `idevicerestore` for macOS is using
-  the following build script which will do the work for you, it will build
-  and install all required dependencies:
-  ```bash
-  mkdir -p limd-build
-  cd limd-build
-  curl -o ./limd-build-macos.sh -L https://is.gd/limdmacos
-  bash ./limd-build-macos.sh
-  ```
-  Follow the prompts of the script and you should have a working `idevicerestore`
-  available.
-
-  **Option 2**:
+  **Option X**:
   Use either [MacPorts](https://www.macports.org/)
   or [Homebrew](https://brew.sh/) to install `automake`, `autoconf`, and `libtool`.
 
@@ -130,7 +85,7 @@ tar -xvf resource.tar
   brew install libtool autoconf automake
   ```
 
-  `idevicerestore` has a few dependencies from the libimobiledevice project.
+  This `idevicerestore` fork has a few dependencies from the libimobiledevice project.
   You will have to build and install the following:
   * [libplist](https://github.com/libimobiledevice/libplist)
   * [libimobiledevice-glue](https://github.com/libimobiledevice/libimobiledevice-glue)
@@ -141,74 +96,26 @@ tar -xvf resource.tar
   
   If you want to enable turdus merula, you also need the following dependency:
   * [libfragmentzip](https://github.com/turdus-m3rula/libfragmentzip)
-
-  Check their `README.md` for building and installation instructions.
-
-#### Windows
-
-* Using [MSYS2](https://www.msys2.org/) is the official way of compiling this project on Windows. Download the MSYS2 installer
-  and follow the installation steps.
-
-  It is recommended to use the _MSYS2 MinGW 64-bit_ shell. Run it and make sure the required dependencies are installed:
-
-  ```shell
-  pacman -S base-devel \
-  	git \
-  	mingw-w64-x86_64-gcc \
-  	make \
-  	libtool \
-  	autoconf \
-  	automake-wrapper \
-  	pkg-config \
-  	libcurl-devel \
-  	mingw-w64-x86_64-libzip
-  ```
-  NOTE: You can use a different shell and different compiler according to your needs. Adapt the above command accordingly.
-
-  `idevicerestore` has a few dependencies from the libimobiledevice project.
-  You will have to build and install the following:
-  * [libplist](https://github.com/libimobiledevice/libplist)
-  * [libimobiledevice-glue](https://github.com/libimobiledevice/libimobiledevice-glue)
-  * [libusbmuxd](https://github.com/libimobiledevice/libusbmuxd)
-  * [libimobiledevice](https://github.com/libimobiledevice/libimobiledevice)
-  * [libirecovery](https://github.com/libimobiledevice/libirecovery)
-  * [libtatsu](https://github.com/libimobiledevice/libtatsu)
+  * [zstd](https://github.com/facebook/zstd)
 
   Check their `README.md` for building and installation instructions.
 
 
 ### Configuring the source tree
 
-You can build the source code from a git checkout, or from a `.tar.bz2` release tarball from [Releases](https://github.com/libimobiledevice/idevicerestore/releases).
-Before we can build it, the source tree has to be configured for building. The steps depend on where you got the source from.
-
 * **From git**
 
   If you haven't done already, clone the actual project repository and change into the directory.
   ```shell
-  git clone https://github.com/libimobiledevice/idevicerestore.git
+  git clone https://github.com/turdus-m3rula/idevicerestore.git
   cd idevicerestore
   ```
+  
+  - [Preparation](#preparation-for-building-turdus-merula)
 
   Configure the source tree for building:
   ```shell
   ./autogen.sh
-  ```
-
-* **From release tarball (.tar.bz2)**
-
-  When using an official [release tarball](https://github.com/libimobiledevice/idevicerestore/releases) (`idevicerestore-x.y.z.tar.bz2`)
-  the procedure is slightly different.
-
-  Extract the tarball:
-  ```shell
-  tar xjf idevicerestore-x.y.z.tar.bz2
-  cd idevicerestore-x.y.z
-  ```
-
-  Configure the source tree for building:
-  ```shell
-  ./configure
   ```
 
 Both `./configure` and `./autogen.sh` (which generates and calls `configure`) accept a few options, for example `--prefix` to allow
@@ -301,40 +208,12 @@ idevicerestore --help
 man idevicerestore
 ```
 
-### Docker
-
-Build the container with `build.sh` in the docker folder, which will build a
-docker container with the latest source versions of all the required libraries.
-
-Run the container with `run.sh --latest` in the docker folder,
-which will execute `usbmuxd` in the background, and then start `idevicerestore --latest`.
-Any arguments passed to `run.sh` will be passed in to `idevicerestore`.
-
-## Contributing
-
-We welcome contributions from anyone and are grateful for every pull request!
-
-If you'd like to contribute, please fork the `master` branch, change, commit and
-send a pull request for review. Once approved it can be merged into the main
-code base.
-
-If you plan to contribute larger changes or a major refactoring, please create a
-ticket first to discuss the idea upfront to ensure less effort for everyone.
-
-Please make sure your contribution adheres to:
-* Try to follow the code style of the project
-* Commit messages should describe the change well without being too short
-* Try to split larger changes into individual commits of a common domain
-* Use your real name and a valid email address for your commits
 
 ## Links
 
-* Homepage: https://libimobiledevice.org/
-* Repository: https://github.com/libimobiledevice/idevicerestore.git
-* Repository (Mirror): https://git.libimobiledevice.org/idevicerestore.git
-* Issue Tracker: https://github.com/libimobiledevice/idevicerestore/issues
-* Mailing List: https://lists.libimobiledevice.org/mailman/listinfo/libimobiledevice-devel
-* Twitter: https://twitter.com/libimobiledev
+* libimobiledevice Homepage: https://libimobiledevice.org/
+* Original Repository: https://github.com/libimobiledevice/idevicerestore.git
+* Original Repository (Mirror): https://git.libimobiledevice.org/idevicerestore.git
 
 ## License
 
