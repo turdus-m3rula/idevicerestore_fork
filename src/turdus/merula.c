@@ -61,6 +61,27 @@ size_t gCPFLength = 0;
 void* gRAMDisk = NULL;
 size_t gRAMDiskLength = 0;
 
+void fragmentzip_callback(unsigned int p)
+{
+	int i = 0;
+	int width = 50;
+	int filled = (p * width) / 100;
+	printf("\r%s [", "Downloading");
+	for (i = 0; i < width; i++) {
+		if (i < filled) {
+			putchar('=');
+		}
+		else {
+			putchar(' ');
+		}
+	}
+	printf("] %3u%%", p);
+	fflush(stdout);
+	if (p >= 100) {
+		printf("\n");
+	}
+}
+
 #pragma mark - zstd
 int decompress_zstd_buffer(const void* srcbuf, size_t srclen, size_t maxlen, void** outbuf, size_t* outlen)
 {
@@ -684,7 +705,7 @@ int download_component_by_name(fragmentzip_t* fragment, const char* name, const 
 	logger(LL_INFO, "Downloading %s\n", value);
 	char* tmp_buf = NULL;
 	size_t tmp_len = 0;
-	if (fragmentzip_download_to_memory(fragment, value, &tmp_buf, &tmp_len, NULL)) {
+	if (fragmentzip_download_to_memory(fragment, value, &tmp_buf, &tmp_len, fragmentzip_callback)) {
 		logger(LL_ERROR, "Could not find %s\n", value);
 		free(value);
 		return -1;
@@ -2687,8 +2708,10 @@ int recovery_send_ramdisk_component(struct idevicerestore_client_t* client, plis
 	logger(LL_INFO, "Sending %s (%zu bytes)...\n", component, size);
 	
 	// FIXME: Did I do this right????
+	register_progress('RECV', "Uploading");
 	err = irecv_send_buffer(client->recovery->client, data, size, 0);
 	free(data);
+	finalize_progress('RECV');
 	if (err != IRECV_E_SUCCESS) {
 		logger(LL_ERROR, "Unable to send %s component: %s\n", component, irecv_strerror(err));
 		return -1;

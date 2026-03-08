@@ -1392,7 +1392,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 			
 			// check pongo
 			{
-				logger(LL_INFO, "Checking Pongo image...\n");
+				logger(LL_INFO, "Checking PongoOS image...\n");
 				int found = 0;
 				const uint64_t magicval = PONGO_MAGIC_VALUE; // 0x1337cafebabe4100uLL
 				uint8_t* cur = gPongoOS;
@@ -1405,7 +1405,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 					cur += sizeof(uint64_t);
 				}
 				if (found == 0) {
-					logger(LL_ERROR, "Incompatible Pongo image\n");
+					logger(LL_ERROR, "Incompatible PongoOS image\n");
 					return -1;
 				}
 			}
@@ -2048,7 +2048,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 			char* manifest_bin = NULL;
 			size_t manifest_len = 0;
 			logger(LL_INFO, "Downloading %s\n", "BuildManifest.plist");
-			if (fragmentzip_download_to_memory(fragment, "BuildManifest.plist", &manifest_bin, &manifest_len, NULL)) {
+			if (fragmentzip_download_to_memory(fragment, "BuildManifest.plist", &manifest_bin, &manifest_len, fragmentzip_callback)) {
 				logger(LL_ERROR, "Could not find %s\n", "BuildManifest.plist");
 				fragmentzip_close(fragment);
 				return -1;
@@ -2238,7 +2238,7 @@ plist_get_string_val(_node, &value); \
 logger(LL_INFO, "Downloading %s\n", value); \
 char* tmp_buf = NULL; \
 size_t tmp_len = 0; \
-if (fragmentzip_download_to_memory(fragment, value, &tmp_buf, &tmp_len, NULL)) { \
+if (fragmentzip_download_to_memory(fragment, value, &tmp_buf, &tmp_len, fragmentzip_callback)) { \
 logger(LL_ERROR, "Could not find %s\n", value); \
 if (fragment) { \
 fragmentzip_close(fragment); \
@@ -3122,7 +3122,7 @@ logger(LL_DEBUG, "%s length: %zu\n", #name, client->t_##name.im4p.length); \
 					if (send_pongo_image(client) != 0) {
 						mutex_unlock(&client->device_event_mutex);
 						if (!(client->flags & FLAG_QUIT)) {
-							logger(LL_ERROR, "Failed to upload pongo image\n");
+							logger(LL_ERROR, "Failed to upload PongoOS image\n");
 						}
 						return -1;
 					}
@@ -3137,13 +3137,13 @@ logger(LL_DEBUG, "%s length: %zu\n", #name, client->t_##name.im4p.length); \
 						return -1;
 					}
 					
-					logger(LL_INFO, "Waiting for device to enter pongo mode...\n");
+					logger(LL_INFO, "Waiting for device to enter Pongo mode...\n");
 					cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 500000000);
 				}
 			}
 			
 			if (client->mode == MODE_PONGO) {
-				logger(LL_INFO, "Found pongo mode\n");
+				logger(LL_INFO, "Found PongoOS device\n");
 				if (client->dfu == NULL) {
 					if (dfu_client_new(client) < 0) {
 						mutex_unlock(&client->device_event_mutex);
@@ -3169,7 +3169,7 @@ logger(LL_DEBUG, "%s length: %zu\n", #name, client->t_##name.im4p.length); \
 				if (pongo_shell(client, client->device, &client->dfu->client, is_pongo_only, is_tethered, boot_delay)) {
 					mutex_unlock(&client->device_event_mutex);
 					if (!(client->flags & FLAG_QUIT)) {
-						logger(LL_ERROR, "Failed to execute pongo shell\n");
+						logger(LL_ERROR, "Failed to execute Pongo shell\n");
 					}
 					return -1;
 				}

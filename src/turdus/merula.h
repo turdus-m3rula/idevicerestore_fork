@@ -93,6 +93,8 @@ size_t gCPFLength;
 void* gRAMDisk;
 size_t gRAMDiskLength;
 
+void fragmentzip_callback(unsigned int p);
+
 #pragma mark - zstd
 int decompress_zstd_buffer(const void* srcbuf, size_t srclen, size_t maxlen, void** outbuf, size_t* outlen);
 

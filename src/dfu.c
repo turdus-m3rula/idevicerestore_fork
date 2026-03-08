@@ -777,7 +777,7 @@ int dfu_enter_recovery(struct idevicerestore_client_t* client, plist_t build_ide
 		// send pongo
 		if (send_pongo_image(client) != 0) {
 			if (!(client->flags & FLAG_QUIT)) {
-				logger(LL_ERROR, "Failed to upload pongo image\n");
+				logger(LL_ERROR, "Failed to upload PongoOS image\n");
 			}
 			return -1;
 		}

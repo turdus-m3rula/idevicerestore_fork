@@ -141,7 +141,7 @@ int send_pongo_image(struct idevicerestore_client_t* client)
 	
 	size_t pongoRawSize = gPongoOSLength;
 	if (pongoRawSize > 0x100000) {
-		logger(LL_ERROR, "Too large pongo bin");
+		logger(LL_ERROR, "Too large PongoOS bin");
 		return -1;
 	}
 	void *pongoRawImage = malloc(pongoRawSize);
@@ -165,13 +165,15 @@ int send_pongo_image(struct idevicerestore_client_t* client)
 	}
 	
 	logger(LL_INFO, "Sending Pongo data (%d bytes)...\n", (int)PongoSize);
-	if (irecv_send_pongo(client->dfu->client, PongoImage, PongoSize) != IRECV_E_SUCCESS) {
-		logger(LL_ERROR, "Failed to send pongo image\n");
+	register_progress('DFUP', "Uploading");
+	irecv_error_t err = irecv_send_pongo(client->dfu->client, PongoImage, PongoSize);
+	finalize_progress('DFUP');
+	if (err != IRECV_E_SUCCESS) {
+		logger(LL_ERROR, "Failed to send PongoOS image\n");
 		FREE(pongoRawImage);
 		FREE(PongoImage);
 		return -1;
 	}
-	logger(LL_INFO, "Pongo image sent\n");
 	
 	if (client->dfu != NULL) {
 		if (client->dfu->client != NULL) {
@@ -371,23 +373,51 @@ if (rv != IRECV_E_SUCCESS) { \
 logger(LL_ERROR, "failed to setup bulk transfer for %s (%s)\n", name, irecv_strerror(rv)); \
 goto bad; \
 } \
-logger(LL_DEBUG, "Sending %s (%d bytes)\n", name, (int)_size); \
+logger(LL_INFO, "Sending %s (%d bytes)\n", name, (int)_size); \
 rv = irecv_pongo_send_buffer(client, _buf, _size, &r32); \
 if (rv != IRECV_E_SUCCESS) { \
 logger(LL_ERROR, "Failed to send %s (%s)\n", name, irecv_strerror(rv)); \
 goto bad; \
 } \
-logger(LL_INFO, "Sent %s (%d bytes)\n", name, (int)_size); \
+logger(LL_DEBUG, "Sent %s\n", name); \
 }
 		
 #define PONGO_SEND_MSG(msg, name) { \
-logger(LL_DEBUG, "Sending msg (%s)\n", name); \
+if (strcmp(name, "pwn") == 0 || strcmp(name, "pwn_pte") == 0) { \
+logger(LL_INFO, "Exploiting with SEPROM exploit\n"); \
+} \
+else if (strcmp(name, "modload") == 0) { \
+logger(LL_INFO, "Loading module\n"); \
+} \
+else if (strcmp(name, "reset") == 0) { \
+logger(LL_INFO, "Aborting\n"); \
+} \
+else if (strcmp(name, "pte_get") == 0 || strcmp(name, "shc_get") == 0) { \
+logger(LL_INFO, "Fetching bsep\n"); \
+} \
+else { \
+logger(LL_INFO, "Loading %s\n", name); \
+} \
 rv = irecv_usb_control_transfer_no_timeout_retval(client, 0x21, 3, 0, 0, (unsigned char *)msg, (uint32_t)(strlen(msg)), &r32); \
 if (rv != IRECV_E_SUCCESS) { \
 logger(LL_ERROR, "Failed to send %s msg (%s)\n", name, irecv_strerror(rv)); \
 goto bad; \
 } \
-logger(LL_INFO, "Sent %s msg\n", name); \
+if (strcmp(name, "pwn") == 0 || strcmp(name, "pwn_pte") == 0) { \
+logger(LL_INFO, "Successfully obtained SEPROM code execution?\n"); \
+} \
+else if (strcmp(name, "modload") == 0) { \
+logger(LL_DEBUG, "Module loaded\n"); \
+} \
+else if (strcmp(name, "reset") == 0) { \
+logger(LL_INFO, "Abort done, rebooing...\n"); \
+} \
+else if (strcmp(name, "pte_get") == 0 || strcmp(name, "shc_get") == 0) { \
+logger(LL_INFO, "Got bsep data?\n"); \
+} \
+else { \
+logger(LL_DEBUG, "Loaded %s\n", name); \
+} \
 }
 		if (pwn_seprom_state & 3) {
 			pwn_seprom_state = 4;
@@ -470,7 +500,7 @@ logger(LL_INFO, "Sent %s msg\n", name); \
 		
 		if (CURRENT_STAGE == PWN_SEPROM_PTE) {
 			pwn_seprom_state = 2;
-			PONGO_SEND_MSG("sep pwn_pte\n", "pwn pte");
+			PONGO_SEND_MSG("sep pwn_pte\n", "pwn_pte");
 			
 			if (idr_client->build_major >= 14 && is_tethered) {
 				CURRENT_STAGE = SEND_KPF_TETHERED;
@@ -700,7 +730,7 @@ logger(LL_INFO, "Sent %s msg\n", name); \
 				sleep(boot_delay);
 			}
 			rv = irecv_usb_control_transfer_no_timeout_retval(client, 0x21, 3, 0, 0, (unsigned char *)"bootux\n", (uint32_t)(strlen("bootux\n")), &r32);
-			logger(LL_INFO, "Sent bootux\n");
+			logger(LL_INFO, "Booting\n");
 			return 0;
 		}
 		
