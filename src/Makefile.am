@@ -1,4 +1,3 @@
-libDER_CFLAGS="-DDER_TAG_SIZE=8"
 
 AM_CFLAGS = \
 	$(GLOBAL_CFLAGS) \
@@ -49,30 +48,15 @@ idevicerestore_SOURCES = \
 	ace3.c ace3.h \
 	download.c download.h \
 	locking.c locking.h
-if HAVE_LIMERA1N
-idevicerestore_SOURCES += limera1n_payload.h limera1n.c limera1n.h
-endif
+
 idevicerestore_CFLAGS = $(AM_CFLAGS)
 idevicerestore_LDFLAGS = $(AM_LDFLAGS)
 idevicerestore_LDADD = $(AM_LDADD)
 if HAVE_TURDUS_MERULA
 idevicerestore_SOURCES += \
-	lz4/lz4.c lz4/lz4.h \
-	lz4/lz4hc.c lz4/lz4hc.h \
-	libDER/DER_Decode.c libDER/DER_Decode.h \
-	libDER/DER_Encode.c libDER/DER_Encode.h \
-	libDER/oids.c libDER/oids.h \
-	libDER/asn1Types.h libDER/libDER_config.h libDER/libDER.h \
-	turdus/pongo.c turdus/pongo.h \
-	turdus/merula.c turdus/merula.h \
-	stuff/cpf_bin.c stuff/cpf_bin.h \
-	stuff/kpf_bin.c stuff/kpf_bin.h \
-	stuff/overlay_iphoneos_bin.c stuff/overlay_tvos_bin.c stuff/overlay_bin.h \
-	stuff/Pongo_bin.c stuff/Pongo_bin.h \
-	stuff/sep_racer_bin.c stuff/sep_racer_bin.h \
-	stuff/union_iphoneos_bin.c stuff/union_tvos_bin.c stuff/union_bin.h
-idevicerestore_CFLAGS += -DHAVE_TURDUS_MERULA $(libDER_CFLAGS) $(libfragmentzip_CFLAGS) $(libzstd_CFLAGS)
-idevicerestore_LDFLAGS += $(libfragmentzip_LIBS) $(libzstd_LIBS)
+	turdus/merula.c turdus/merula.h
+idevicerestore_CFLAGS += -DHAVE_TURDUS_MERULA $(libDER_CFLAGS) $(libfragmentzip_CFLAGS)
+idevicerestore_LDFLAGS += $(libfragmentzip_LIBS)
 endif
 if HAVE_LIBHFSPLUS
 idevicerestore_SOURCES += \

@@ -389,10 +389,7 @@ const char *_img4_get_component_tag(const char *compname)
 		{ "rfta", "rfta" },
 		{ "rfts", "rfts" },
 #ifdef HAVE_TURDUS_MERULA
-		{ "iBootTethered", "rlgo" },
-		{ "iBootTethered2", "ibss" },
 		{ "iBoot32Tethered", "ibob" },
-		{ "SEPTethered", "sepi" },
 #endif
 		{ NULL, NULL }
 	};

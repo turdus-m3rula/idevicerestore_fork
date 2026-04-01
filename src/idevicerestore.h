@@ -36,9 +36,9 @@ extern "C" {
 // the flag with value 1 is reserved for internal use only. don't use it.
 #define FLAG_DEBUG           (1 << 1)
 #define FLAG_ERASE           (1 << 2)
-#define FLAG_CUSTOM          (1 << 3)
+#define FLAG_UNDEFINED_0     (1 << 3)
 #define FLAG_EXCLUDE         (1 << 4)
-#define FLAG_PWN             (1 << 5)
+#define FLAG_UNDEFINED_1     (1 << 5)
 #define FLAG_NOACTION        (1 << 6)
 #define FLAG_SHSHONLY        (1 << 7)
 #define FLAG_LATEST          (1 << 8)
@@ -50,15 +50,6 @@ extern "C" {
 #ifdef HAVE_TURDUS_MERULA
 #define FLAG_DOWNGRADE       (1 << 20)
 #define FLAG_TETHERED        (1 << 21)
-#define FLAG_FETCH_BSEP_SHC  (1 << 22)
-#define FLAG_FETCH_BSEP_PTE  (1 << 23)
-#define FLAG_LOAD_BSEP_SHC   (1 << 24)
-#define FLAG_LOAD_BSEP_PTE   (1 << 25)
-
-#define FLAG_CHECK_A8        (FLAG_FETCH_BSEP_SHC | FLAG_FETCH_BSEP_PTE | FLAG_LOAD_BSEP_SHC | FLAG_LOAD_BSEP_PTE)
-#define FLAG_CHECK_A9        (FLAG_FETCH_BSEP_SHC | FLAG_LOAD_BSEP_SHC | FLAG_LOAD_BSEP_PTE)
-#define FLAG_FETCH_BSEP      (FLAG_FETCH_BSEP_SHC | FLAG_FETCH_BSEP_PTE)
-#define FLAG_LOAD_BSEP       (FLAG_FETCH_BSEP_SHC | FLAG_FETCH_BSEP_PTE)
 
 #define FLAG_ALLOW_UNSUPPORTED (1 << 29)
 #endif

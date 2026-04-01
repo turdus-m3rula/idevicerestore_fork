@@ -41,9 +41,6 @@ struct restore_client_t {
 	uint64_t protocol_version;
 	restored_client_t client;
 	plist_t build_identity;
-#ifdef HAVE_TURDUS_MERULA
-	plist_t cryptex1tss;
-#endif
 };
 
 int restore_check_mode(struct idevicerestore_client_t* client);

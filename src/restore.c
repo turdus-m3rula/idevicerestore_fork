@@ -161,12 +161,6 @@ void restore_client_free(struct idevicerestore_client_t* client)
 			plist_free(client->restore->bbtss);
 			client->restore->bbtss = NULL;
 		}
-#ifdef HAVE_TURDUS_MERULA
-		if (client->restore->cryptex1tss) {
-			plist_free(client->restore->cryptex1tss);
-			client->restore->cryptex1tss = NULL;
-		}
-#endif
 		free(client->restore);
 		client->restore = NULL;
 	}
@@ -1122,7 +1116,7 @@ int restore_send_recovery_os_root_ticket(struct idevicerestore_client_t* client,
 		unsigned char* data = NULL;
 		unsigned int len = 0;
 
-		if (!client->tss_recoveryos_root_ticket && !(client->flags & FLAG_CUSTOM)) {
+		if (!client->tss_recoveryos_root_ticket) {
 			logger(LL_ERROR, "Cannot send RootTicket without TSS\n");
 			return -1;
 		}
@@ -1133,7 +1127,7 @@ int restore_send_recovery_os_root_ticket(struct idevicerestore_client_t* client,
 				return -1;
 			}
 		} else {
-			if (!(client->flags & FLAG_CUSTOM) && (tss_response_get_ap_ticket(client->tss, &data, &len) < 0)) {
+			if (tss_response_get_ap_ticket(client->tss, &data, &len) < 0) {
 				logger(LL_ERROR, "Unable to get ticket from TSS\n");
 				return -1;
 			}
@@ -1182,7 +1176,7 @@ int restore_send_root_ticket(struct idevicerestore_client_t* client, plist_t mes
 		unsigned char* data = NULL;
 		unsigned int len = 0;
 
-		if (!client->tss && !(client->flags & FLAG_CUSTOM)) {
+		if (!client->tss) {
 			logger(LL_ERROR, "Cannot send RootTicket without TSS\n");
 			return -1;
 		}
@@ -1193,7 +1187,7 @@ int restore_send_root_ticket(struct idevicerestore_client_t* client, plist_t mes
 				return -1;
 			}
 		} else {
-			if (!(client->flags & FLAG_CUSTOM) && (tss_response_get_ap_ticket(client->tss, &data, &len) < 0)) {
+			if (tss_response_get_ap_ticket(client->tss, &data, &len) < 0) {
 				logger(LL_ERROR, "Unable to get ticket from TSS\n");
 				return -1;
 			}
@@ -1765,18 +1759,12 @@ memcpy(component_data, client->t_##name.im4p.data, component_size); \
 			OVERRIDE_FW_COMP(iBoot);
 			OVERRIDE_FW_COMP(AppleLogo);
 			OVERRIDE_FW_COMP(RecoveryMode);
-			if (client->device->product_type && strncmp(client->device->product_type, "AppleTV", 7) == 0) {
-				// AppleTV
-			}
-			else {
-				// iPhone, iPad, iPod touch
-				OVERRIDE_FW_COMP(BatteryCharging0);
-				OVERRIDE_FW_COMP(BatteryCharging1);
-				OVERRIDE_FW_COMP(BatteryFull);
-				OVERRIDE_FW_COMP(BatteryLow0);
-				OVERRIDE_FW_COMP(BatteryLow1);
-				OVERRIDE_FW_COMP(BatteryPlugin);
-			}
+			OVERRIDE_FW_COMP(BatteryCharging0);
+			OVERRIDE_FW_COMP(BatteryCharging1);
+			OVERRIDE_FW_COMP(BatteryFull);
+			OVERRIDE_FW_COMP(BatteryLow0);
+			OVERRIDE_FW_COMP(BatteryLow1);
+			OVERRIDE_FW_COMP(BatteryPlugin);
 		}
 #endif
 
@@ -1818,13 +1806,7 @@ memcpy(component_data, client->t_##name.im4p.data, component_size); \
 					logger(LL_ERROR, "Unable to extract component: %s\n", "iBootTethered");
 					return -1;
 				}
-				const char* my_comp_name = "iBootTethered";
-				if (have_arm64_single_stage_iboot(client->cpid)) {
-					my_comp_name = "iBootTethered2";
-				}
-				if (is_armv7s_soc(client->cpid)) {
-					my_comp_name = "iBoot32Tethered";
-				}
+				const char* my_comp_name = "iBoot32Tethered";
 				if (personalize_component(client, my_comp_name, component_data, component_size, client->tss, &nor_data, &nor_size) < 0) {
 					free(iter);
 					free(comp);
@@ -1842,32 +1824,11 @@ memcpy(component_data, client->t_##name.im4p.data, component_size); \
 				free(component_data);
 				component_data = NULL;
 				component_size = 0;
-				if (have_arm64_single_stage_iboot(client->cpid)) {
-					char zfn[1024];
-					if (client->cache_dir) {
-						strcpy(zfn, client->cache_dir);
-						strcat(zfn, "/image4");
-					}
-					else {
-						strcpy(zfn, "image4");
-					}
-					mkdir_with_parents(zfn, 0755);
-					snprintf(&zfn[0] + strlen(zfn), sizeof(zfn) - strlen(zfn), "/%" PRIu64 "-%s-%s-iBoot.img4", client->ecid, client->device->product_type, client->version);
-					FILE *zf = fopen(zfn, "wb");
-					if (zf) {
-						fwrite(nor_data, nor_size, 1, zf);
-						fflush(zf);
-						fclose(zf);
-						logger(LL_INFO, "iBoot img4 saved to '%s'\n", zfn);
-					}
+				if (flash_version_1) {
+					plist_dict_set_item(norimage, my_comp_name, plist_new_data((char*)nor_data, nor_size));
 				}
 				else {
-					if (flash_version_1) {
-						plist_dict_set_item(norimage, my_comp_name, plist_new_data((char*)nor_data, nor_size));
-					}
-					else {
-						plist_array_append_item(norimage, plist_new_data((char*)nor_data, nor_size));
-					}
+					plist_array_append_item(norimage, plist_new_data((char*)nor_data, nor_size));
 				}
 			}
 		}
@@ -1881,33 +1842,6 @@ memcpy(component_data, client->t_##name.im4p.data, component_size); \
 	}
 	free(iter);
 	plist_free(firmware_files);
-#ifdef HAVE_TURDUS_MERULA
-	if (client->flags & FLAG_TETHERED) { // A10+, iOS <= 13: append sepi image (prevent iboot panic loop)
-		if (have_arm64_single_stage_iboot(client->cpid) && client->build_major <= 17 && client->rsep.data) {
-			const char* my_comp_name = "SEP";
-			logger(LL_INFO, "Append SEPI image (using cached SEP data)\n");
-			size_t sepi_size = client->rsep.length;
-			void* sepi_data = malloc(sepi_size);
-			unsigned char* nor_data = NULL;
-			size_t nor_size = 0;
-			memcpy(sepi_data, client->rsep.data, sepi_size);
-			if (personalize_component(client, my_comp_name, sepi_data, sepi_size, client->rsep.tss, (void **)&nor_data, &nor_size) < 0) {
-				free(nor_data);
-				free(sepi_data);
-				logger(LL_ERROR, "Unable to get personalized component: %s\n", my_comp_name);
-				return -1;
-			}
-			if (flash_version_1) {
-				plist_dict_set_item(norimage, my_comp_name, plist_new_data((char*)nor_data, nor_size));
-			}
-			else {
-				plist_array_append_item(norimage, plist_new_data((char*)nor_data, nor_size));
-			}
-			free(sepi_data);
-			free(nor_data);
-		}
-	}
-#endif
 	plist_dict_set_item(dict, "NorImageData", norimage);
 
 	void* personalized_data = NULL;
@@ -1923,11 +1857,6 @@ memcpy(component_data, client->t_##name.im4p.data, component_size); \
 			return -1;
 		}
 		plist_t sep_tss = client->tss;
-#ifdef HAVE_TURDUS_MERULA
-		if (client->flags & FLAG_TETHERED) {
-			sep_tss = client->rsep.tss;
-		}
-#endif
 		ret = personalize_component(client, component, component_data, component_size, sep_tss, &personalized_data, &personalized_size);
 		free(component_data);
 		component_data = NULL;
@@ -1954,23 +1883,6 @@ memcpy(component_data, client->t_##name.im4p.data, component_size); \
 		}
 
 		plist_t sep_tss = client->tss;
-#ifdef HAVE_TURDUS_MERULA
-		// prevent iboot panic loop // TODO: better handle
-		if (client->flags & FLAG_TETHERED) {
-			sep_tss = client->rsep.tss;
-			if ((client->build_major >= 18) && have_arm64_single_stage_iboot(client->cpid)) { // A10+, iOS 14+
-				// This device doesn't use sep img4 on fs so it's fine anyway
-				if (client->rsep.data) {
-					logger(LL_INFO, "Using cached SEP data\n");
-					free(component_data);
-					component_data = NULL;
-					component_size = client->rsep.length;
-					component_data = malloc(component_size);
-					memcpy(component_data, client->rsep.data, component_size);
-				}
-			}
-		}
-#endif
 		ret = personalize_component(client, component, component_data, component_size, sep_tss, &personalized_data, &personalized_size);
 		free(component_data);
 		component_data = NULL;
@@ -2887,10 +2799,6 @@ static plist_t restore_get_se_firmware_data(struct idevicerestore_client_t* clie
 	int ret;
 	uint64_t chip_id = 0;
 
-#ifdef HAVE_TURDUS_MERULA
-	bool use_latest_sefw = 0;
-#endif
-
 	if (!client || !client->restore || !client->restore->build_identity) {
 		logger(LL_ERROR, "%s: idevicerestore client not initialized?!\n", __func__);
 		return NULL;
@@ -2954,44 +2862,6 @@ static plist_t restore_get_se_firmware_data(struct idevicerestore_client_t* clie
 	plist_free(request);
 	request = NULL;
 
-#ifdef HAVE_TURDUS_MERULA
-	if (response == NULL) {
-		if ((client->sefw.identity != NULL) && (client->sefw.data != NULL)) {
-			logger(LL_INFO, "Using another build manifest\n");
-			use_latest_sefw = 1;
-			
-			/* select new SE build_identity */
-			se_identity = client->sefw.identity;
-			
-			/* create new SE request */
-			request = tss_request_new(NULL);
-			if (request == NULL) {
-				logger(LL_ERROR, "Unable to create SE TSS request\n");
-				free(component_data);
-				return NULL;
-			}
-			parameters = plist_new_dict();
-			
-			/* add manifest for current build_identity to parameters */
-			tss_parameters_add_from_manifest(parameters, se_identity, true);
-			
-			/* add SE,* tags from info dictionary to parameters */
-			plist_dict_merge(&parameters, p_info);
-			
-			/* add required tags for SE TSS request */
-			tss_request_add_se_tags(request, parameters, NULL);
-			
-			plist_free(parameters);
-			parameters = NULL;
-			
-			logger(LL_INFO, "Sending new SE TSS request...\n");
-			response = tss_request_send(request, client->tss_url);
-			plist_free(request);
-			request = NULL;
-		}
-	}
-#endif
-
 	if (response == NULL) {
 		logger(LL_ERROR, "Unable to fetch SE ticket\n");
 		free(component_data);
@@ -3007,23 +2877,11 @@ static plist_t restore_get_se_firmware_data(struct idevicerestore_client_t* clie
 	}
 
 	/* don't add FirmwareData if not requested via ResponseTags */
-#ifdef HAVE_TURDUS_MERULA
-	if (client->cpid == 0x8010 || client->cpid == 0x8011) {
-		// This change will cause SE updates to fail in Icefall
+	if (!_wants_firmware_data(arguments)) {
+		logger(LL_DEBUG, "Not adding FirmwareData as it was not requested\n");
+		return response;
 	}
-	else {
-#endif
-		if (!_wants_firmware_data(arguments)) {
-			logger(LL_DEBUG, "Not adding FirmwareData as it was not requested\n");
-			return response;
-		}
-#ifdef HAVE_TURDUS_MERULA
-	}
-#endif
 
-#ifdef HAVE_TURDUS_MERULA
-	if (!use_latest_sefw) {
-#endif
 	if (build_identity_get_component_path(se_identity, comp_name, &comp_path) < 0) {
 		plist_free(response);
 		logger(LL_ERROR, "Unable to get path for '%s' component\n", comp_name);
@@ -3038,23 +2896,6 @@ static plist_t restore_get_se_firmware_data(struct idevicerestore_client_t* clie
 		logger(LL_ERROR, "Unable to extract '%s' component\n", comp_name);
 		return NULL;
 	}
-#ifdef HAVE_TURDUS_MERULA
-	}
-#endif
-
-#ifdef HAVE_TURDUS_MERULA
-	else {
-		logger(LL_INFO, "using another se firmware\n");
-		component_size = client->sefw.length;
-		component_data = malloc(component_size);
-		if (!component_data) {
-			plist_free(response);
-			logger(LL_ERROR, "Unable to alloc '%s' component\n", comp_name);
-			return NULL;
-		}
-		memcpy(component_data, client->sefw.data, component_size);
-	}
-#endif
 
 	plist_dict_set_item(response, "FirmwareData", plist_new_data((char*)component_data, component_size));
 	free(component_data);
@@ -3909,22 +3750,7 @@ static plist_t restore_get_cryptex1_firmware_data(struct idevicerestore_client_t
 	plist_t request = NULL;
 	plist_t response = NULL;
 
-#ifdef HAVE_TURDUS_MERULA
-	if ((client->flags & (FLAG_CUSTOM | FLAG_DOWNGRADE)) && !(client->flags & FLAG_TETHERED)) {
-		logger(LL_INFO, "Checking for local shsh\n");
-		if (!get_cryptex1_local_cache(client, &response)) {
-			return response;
-		}
-		logger(LL_INFO, "Trying to fetch new SHSH blob\n");
-	}
-#endif
-
 	plist_t my_build_identity = client->restore->build_identity;
-#ifdef HAVE_TURDUS_MERULA
-	if (client->flags & FLAG_TETHERED) {
-		my_build_identity = client->base.identity;
-	}
-#endif
 	if (!client || !client->restore || !my_build_identity) {
 		logger(LL_ERROR, "%s: idevicerestore client not initialized?!\n", __func__);
 		return NULL;
@@ -3995,73 +3821,6 @@ static plist_t restore_get_cryptex1_firmware_data(struct idevicerestore_client_t
 	tss_request_add_cryptex_tags(request, parameters, NULL);
 
 	plist_free(parameters);
-
-#ifdef HAVE_TURDUS_MERULA
-	if (client->flags & FLAG_TETHERED) {
-		logger(LL_INFO, "Spoofing %s TSS request...\n", s_updater_name);
-		// Ap,OSLongVersion
-		// Cryptex1,PreauthorizationVersion
-		// Cryptex1,Version
-		struct cryptex1_version_item_map {
-			const char* item_name;
-		};
-		struct cryptex1_version_item_map cryptex1_version_item_map[] = {
-			{ "Cryptex1,PreauthorizationVersion" },
-			{ "Cryptex1,Version" },
-			{ "UniqueBuildID" },
-			{ NULL },
-		};
-		
-		int i = 0;
-		while (cryptex1_version_item_map[i].item_name != NULL) {
-			plist_t item_dict = plist_dict_get_item(my_build_identity, cryptex1_version_item_map[i].item_name);
-			if (item_dict) {
-				plist_dict_remove_item(request, cryptex1_version_item_map[i].item_name);
-				plist_dict_set_item(request, cryptex1_version_item_map[i].item_name, plist_copy(item_dict));
-			}
-			i++;
-		}
-		
-		// Digest(s)
-		// - Cryptex1,SystemOS
-		// - Cryptex1,SystemVolume
-		// - Cryptex1,SystemTrustCache
-		// - Cryptex1,AppOS
-		// - Cryptex1,AppVolume
-		// - Cryptex1,AppTrustCache
-		struct cryptex1_digest_item_map {
-			const char* item_name;
-		};
-		struct cryptex1_digest_item_map cryptex1_digest_item_map[] = {
-			{ "Cryptex1,SystemOS" },
-			{ "Cryptex1,SystemVolume" },
-			{ "Cryptex1,SystemTrustCache" },
-			{ "Cryptex1,AppOS" },
-			{ "Cryptex1,AppVolume" },
-			{ "Cryptex1,AppTrustCache" },
-			{ NULL },
-		};
-		
-		i = 0;
-		while (cryptex1_digest_item_map[i].item_name != NULL) {
-			plist_t item_manif = plist_dict_get_item(my_build_identity, "Manifest");
-			if (item_manif) {
-				plist_t item_cryptex1 = plist_dict_get_item(item_manif, cryptex1_digest_item_map[i].item_name);
-				if (item_cryptex1) {
-					plist_t item_cryptex1_dgst = plist_dict_get_item(item_cryptex1, "Digest");
-					if (item_cryptex1_dgst) {
-						plist_t req_cryptex1 = plist_dict_get_item(request, cryptex1_digest_item_map[i].item_name);
-						if (req_cryptex1) {
-							plist_dict_remove_item(req_cryptex1, "Digest");
-							plist_dict_set_item(req_cryptex1, "Digest", plist_copy(item_cryptex1_dgst));
-						}
-					}
-				}
-			}
-			i++;
-		}
-	}
-#endif
 
 	logger(LL_INFO, "Sending %s TSS request...\n", s_updater_name);
 	response = tss_request_send(request, client->tss_url);
@@ -5760,18 +5519,6 @@ int restore_device(struct idevicerestore_client_t* client, plist_t build_identit
 		}
 #endif
 	}
-
-#ifdef HAVE_TURDUS_MERULA
-	if (plist_dict_get_item(client->tss, "Cryptex1,Ticket")) {
-		client->restore->cryptex1tss = plist_copy(client->tss);
-	}
-	else {
-		plist_t cryptex1_tss = plist_dict_get_item(client->tss, "cryptexTicket");
-		if (cryptex1_tss) {
-			client->restore->cryptex1tss = plist_copy(cryptex1_tss);
-		}
-	}
-#endif
 
 #ifdef HAVE_REVERSE_PROXY
 	logger(LL_INFO, "Starting Reverse Proxy\n");

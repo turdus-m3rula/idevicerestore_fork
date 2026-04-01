@@ -49,9 +49,6 @@ extern "C" {
 #define _MODE_RESTORE         4
 #define _MODE_NORMAL          5
 #define _MODE_PORTDFU         6
-#ifdef HAVE_TURDUS_MERULA
-#define _MODE_PONGO           7
-#endif
 
 #define MODE_UNKNOWN  &idevicerestore_modes[_MODE_UNKNOWN]
 #define MODE_WTF      &idevicerestore_modes[_MODE_WTF]
@@ -60,9 +57,6 @@ extern "C" {
 #define MODE_RESTORE  &idevicerestore_modes[_MODE_RESTORE]
 #define MODE_NORMAL   &idevicerestore_modes[_MODE_NORMAL]
 #define MODE_PORTDFU  &idevicerestore_modes[_MODE_PORTDFU]
-#ifdef HAVE_TURDUS_MERULA
-#define MODE_PONGO    &idevicerestore_modes[_MODE_PONGO]
-#endif
 
 #define FLAG_QUIT            1
 
@@ -89,7 +83,6 @@ struct idevicerestore_mode_t {
 };
 
 #ifdef HAVE_TURDUS_MERULA
-#define PONGO_MAGIC_VALUE (0x1337cafebabe4100uLL)
 typedef struct {
 	char* alternative_hwmodel;
 	char* variant;
@@ -166,14 +159,7 @@ struct idevicerestore_client_t {
 	int async_err;
 	
 #ifdef HAVE_TURDUS_MERULA
-	// flag
-	uint64_t kpf_flag;
-	uint64_t cpf_flag;
-	uint64_t sep_racer_flag;
-	uint64_t ramdisk_flag;
-	
 	// mark
-	int disable_serial_output;
 	int use_custom_ticket;
 	int need_asr_patch;
 	
@@ -183,16 +169,8 @@ struct idevicerestore_client_t {
 	
 	// cached blob
 	plist_t local_shsh;
-	char* cryptex1_nonce_seed;
-	
-	// sep
-	sep_image4_component_t sep;
-	void* sep_shellcode_block;
-	size_t sep_shellcode_block_len;
 	
 	firmware_component_t bbfw;
-	firmware_component_t sefw;
-	firmware_component_t rsep;
 	firmware_component_t base; // base->data: ibss image
 	
 	image4_component_t t_LLB;

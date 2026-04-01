@@ -55,10 +55,6 @@
 #include "recovery.h"
 #include "idevicerestore.h"
 
-#ifdef HAVE_LIMERA1N
-#include "limera1n.h"
-#endif
-
 #include "locking.h"
 
 #ifdef HAVE_TURDUS_MERULA
@@ -66,13 +62,6 @@
 #include <zip.h>
 #include <libfragmentzip/libfragmentzip.h>
 #include "turdus/merula.h"
-#include "turdus/pongo.h"
-#include "stuff/Pongo_bin.h"
-#include "stuff/cpf_bin.h"
-#include "stuff/kpf_bin.h"
-#include "stuff/sep_racer_bin.h"
-#include "stuff/overlay_bin.h"
-#include "stuff/union_bin.h"
 static char* ap_shsh_path = NULL;
 #endif
 
@@ -96,14 +85,10 @@ static struct option longopts[] = {
 	
 #ifndef HAVE_TURDUS_MERULA
 	{ "erase",          no_argument,       NULL, 'e' },
-	{ "custom",         no_argument,       NULL, 'c' },
 	{ "latest",         no_argument,       NULL, 'l' },
 	{ "exclude",        no_argument,       NULL, 'x' },
 	{ "shsh",           no_argument,       NULL, 't' },
 	{ "keep-pers",      no_argument,       NULL, 'k' },
-#ifdef HAVE_LIMERA1N
-	{ "pwn",            no_argument,       NULL, 'p' },
-#endif
 	{ "no-action",      no_argument,       NULL, 'n' },
 	{ "restore-mode",   no_argument,       NULL, 'R' },
 	{ "ticket",         required_argument, NULL, 'T' },
@@ -120,44 +105,19 @@ static struct option longopts[] = {
 	{ "bbfw-manifest",   required_argument, NULL, 13 },
 	{ "bbfw-variant",    required_argument, NULL, 14 },
 	
-	{ "sefw",            required_argument, NULL, 15 },
-	{ "sefw-manifest",   required_argument, NULL, 16 },
-	{ "sefw-variant",    required_argument, NULL, 17 },
-	
-	{ "rsep",            required_argument, NULL, 18 },
-	{ "rsep-manifest",   required_argument, NULL, 19 },
-	{ "rsep-variant",    required_argument, NULL, 20 },
-	
 	{ "base-manifest",   required_argument, NULL, 21 },
 	{ "base-variant",    required_argument, NULL, 22 },
 	
 	{ "load-shsh",       required_argument, NULL, 23  },
-	{ "load-shcblock",   required_argument, NULL, 24  },
-	{ "load-pteblock",   required_argument, NULL, 25  },
-	{ "enable-serial",   no_argument,       NULL, 26  },
-	{ "get-shcblock",    no_argument,       NULL, 27  },
-	{ "get-pteblock",    no_argument,       NULL, 28  },
 	{ "allow-unsupport", no_argument,       NULL, 29  },
 	{ "show-hash",       no_argument,       NULL, 30  },
 	{ "api-url",         required_argument, NULL, 31  },
-	
-	{ "override-kpf", required_argument, NULL, 32 },
-	{ "override-cpf", required_argument, NULL, 33 },
-	{ "override-sep-racer", required_argument, NULL, 34 },
-	{ "override-pongo", required_argument, NULL, 35 },
-	{ "override-ramdisk", required_argument, NULL, 36 },
 #endif
 	{ NULL, 0, NULL, 0 }
 };
 
 static void usage(int argc, char* argv[], int err)
 {
-#ifdef HAVE_LIMERA1N
-#define PWN_FLAG_LINE  \
-"  -p, --pwn                          Put device in pwned DFU mode and exit (limera1n devices)\n"
-#else
-#define PWN_FLAG_LINE ""
-#endif
 #ifdef HAVE_TURDUS_MERULA
 #define TURDUS_MERULA_FLAG_LINE "\nDowngrade options:\n" \
 "  -w, --downgrade              Restore device to an official firmware using saved TSS record (SHSH)\n" \
@@ -166,31 +126,14 @@ static void usage(int argc, char* argv[], int err)
 "                               Uses the latest signed SHSH instead\n" \
 "                               (Requires checkm8 exploit on every reboot)\n" \
 "  --load-shsh PATH             Load a custom SHSH from the given PATH\n" \
-"  --load-shcblock PATH         Load SEP ciphertext block (shcblock) for A9/A9X devices\n" \
-"  --load-pteblock PATH         Load SEP ciphertext block (pteblock) for A9/A9X devices\n" \
-"  --enable-serial              Enable serial output during restore\n" \
 "  --alternative-hwmodel MODEL  Override hardware model for alternative signed baseband firmware\n" \
 "  --bbfw PATH                  Override BasebandFirmware image\n" \
 "  --bbfw-manifest PATH         Override BuildManifest for custom BasebandFirmware image\n" \
 "  --bbfw-variant VARIANT       Use given VARIANT to match the build identity to use with custom BasebandFirmware image\n" \
-"  --sefw PATH                  Override SE Firmware image\n" \
-"  --sefw-manifest PATH         Override BuildManifest for custom SE Firmware image\n" \
-"  --sefw-variant VARIANT       Use given VARIANT to match the build identity to use with custom SE Firmware image\n" \
-"  --rsep PATH                  Override RestoreSEP image4 payload\n" \
-"  --rsep-manifest PATH         Override BuildManifest for custom RestoreSEP image4 payload\n" \
-"  --rsep-variant VARIANT       Use given VARIANT to match the build identity to use with custom RestoreSEP image4 payload\n" \
 "  --base-manifest PATH         Override BuildManifest for base firmware used for tethered downgrade\n" \
 "  --base-variant VARIANT       Use given VARIANT to match the build identity to use with base firmware image\n" \
-"  --get-shcblock               Acquire shcblock required for SEPROM exploit (fwload race) on A9/A9X devices\n" \
-"  --get-pteblock               Acquire pteblock required for SEPROM exploit (boot_tz0 race) on A9/A9X devices\n" \
 "  --allow-unsupport            Allow restore to an unsupported firmware version\n" \
 "  --api-url URL                Override default API server URL\n" \
-"  --override-kpf PATH          Override KPF module\n" \
-"  --override-cpf PATH          Override CPF module\n" \
-"  --override-sep-racer PATH    Override sep_racer module\n" \
-"  --override-pongo PATH        Override Pongo\n" \
-"  --override-ramdisk PATH      Override overlay ramdisk\n" \
-"  --show-hash                  Show the SHA2-384 hashes of embedded modules\n\n" \
 "\nThis is a fork of idevicerestore\n"
 #else
 #define TURDUS_MERULA_FLAG_LINE ""
@@ -211,12 +154,10 @@ static void usage(int argc, char* argv[], int err)
 "                               option the on-demand ipsw download is performed before\n" \
 "                               exiting.\n"
 #define NON_TURDUS_MERULA_ADVANCED_OPTION_FLAG_LINE "" \
-"  -c, --custom                 Restore with a custom firmware (requires bootrom exploit)\n" \
 "  -x, --exclude                Exclude nor/baseband upgrade (legacy devices)\n" \
 "  -t, --shsh                   Fetch TSS record and save to .shsh file, then exit\n" \
 "  -z, --no-restore             Do not restore and end after booting to the ramdisk\n" \
 "  -k, --keep-pers              Write personalized components to files for debugging\n" \
-PWN_FLAG_LINE \
 "  -R, --restore-mode           Allow restoring from Restore mode\n" \
 "  -T, --ticket PATH            Use file at PATH to send as AP ticket\n" \
 "  --ignore-errors              Try to continue the restore process after certain\n" \
@@ -237,28 +178,28 @@ PWN_FLAG_LINE \
 	"extracted from an IPSW.\n" \
 	"\n" \
 	"OPTIONS:\n" \
-	"  -i, --ecid ECID                    Target specific device by its ECID\n" \
-	"                                     e.g. 0xaabb123456 (hex) or 1234567890 (decimal)\n" \
-	"  -u, --udid UDID                    Target specific device by its device UDID\n" \
-	"                                     NOTE: only works with devices in normal mode.\n" \
-	"  -y, --no-input                     Non-interactive mode, do not ask for any input.\n" \
-	"                                     WARNING: This will disable certain checks/prompts that\n" \
-	"                                     are supposed to prevent DATA LOSS. Use with caution.\n" \
-	"  --ipsw-info                        Print information about the IPSW at PATH and exit.\n" \
-	"  -h, --help                         Prints this usage information\n" \
-	"  -C, --cache-path DIR               Use specified directory for caching extracted or other\n" \
-	"                                     reused files.\n" \
-	"  --logfile=PATH                     Write logging output to file at PATH. If PATH equals\n" \
-	"                                     'NULL' or 'NONE', no log file will be written.\n" \
-	"  -d, --debug                        Print additional debug output\n" \
-	"  -v, --version                      Print version information\n" \
+	"  -i, --ecid ECID              Target specific device by its ECID\n" \
+	"                               e.g. 0xaabb123456 (hex) or 1234567890 (decimal)\n" \
+	"  -u, --udid UDID              Target specific device by its device UDID\n" \
+	"                               NOTE: only works with devices in normal mode.\n" \
+	"  -y, --no-input               Non-interactive mode, do not ask for any input.\n" \
+	"                               WARNING: This will disable certain checks/prompts that\n" \
+	"                               are supposed to prevent DATA LOSS. Use with caution.\n" \
+	"  --ipsw-info                  Print information about the IPSW at PATH and exit.\n" \
+	"  -h, --help                   Prints this usage information\n" \
+	"  -C, --cache-path DIR         Use specified directory for caching extracted or other\n" \
+	"                               reused files.\n" \
+	"  --logfile=PATH               Write logging output to file at PATH. If PATH equals\n" \
+	"                               'NULL' or 'NONE', no log file will be written.\n" \
+	"  -d, --debug                  Print additional debug output\n" \
+	"  -v, --version                Print version information\n" \
 	NON_TURDUS_MERULA_OPTION_FLAG_LINE \
 	"\n" \
 	"Advanced/experimental options:\n"
-	"  -s, --server URL                   Override default signing server request URL\n" \
-	"  -P, --plain-progress               Print progress as plain step and progress\n" \
-	"  --variant VARIANT                  Use given VARIANT to match the build identity to use,\n" \
-	"                                     e.g. 'Customer Erase Install (IPSW)'\n" \
+	"  -s, --server URL             Override default signing server request URL\n" \
+	"  -P, --plain-progress         Print progress as plain step and progress\n" \
+	"  --variant VARIANT            Use given VARIANT to match the build identity to use,\n" \
+	"                               e.g. 'Customer Erase Install (IPSW)'\n" \
 	NON_TURDUS_MERULA_ADVANCED_OPTION_FLAG_LINE \
 	// Downgrade command
 	TURDUS_MERULA_FLAG_LINE \
@@ -415,11 +356,6 @@ static void irecv_event_cb(const irecv_device_event_t* event, void *userdata)
 				case IRECV_K_PORT_DFU_MODE:
 					client->mode = MODE_PORTDFU;
 					break;
-#ifdef HAVE_TURDUS_MERULA
-				case IRECV_K_PONGO_MODE:
-					client->mode = MODE_PONGO;
-					break;
-#endif
 				case IRECV_K_RECOVERY_MODE_1:
 				case IRECV_K_RECOVERY_MODE_2:
 				case IRECV_K_RECOVERY_MODE_3:
@@ -464,12 +400,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 		return -1;
 	}
 
-	if ((client->flags & FLAG_LATEST) && (client->flags & FLAG_CUSTOM)) {
-		logger(LL_ERROR, "FLAG_LATEST cannot be used with FLAG_CUSTOM.\n");
-		return -1;
-	}
-
-	if (!client->ipsw && !(client->flags & FLAG_PWN) && !(client->flags & FLAG_LATEST)) {
+	if (!client->ipsw && !(client->flags & FLAG_LATEST)) {
 		logger(LL_ERROR, "no ipsw file given\n");
 		return -1;
 	}
@@ -619,11 +550,6 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 	idevicerestore_progress(client, RESTORE_STEP_DETECT, 0.2);
 	logger(LL_INFO, "Identified device as %s, %s\n", client->device->hardware_model, client->device->product_type);
 
-	if ((client->flags & FLAG_PWN) && (client->mode != MODE_DFU)) {
-		logger(LL_ERROR, "you need to put your device into DFU mode to pwn it.\n");
-		return -1;
-	}
-
 #ifdef HAVE_TURDUS_MERULA
 	if (client->flags & FLAG_DOWNGRADE) {
 		if (client->mode != MODE_DFU) { // check pwnd DFU
@@ -637,9 +563,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 		}
 		
 		if (
-			(client->flags & FLAG_CUSTOM) ||
 			(client->flags & FLAG_EXCLUDE) ||
-			(client->flags & FLAG_PWN) ||
 			(client->flags & FLAG_SHSHONLY) ||
 			(client->flags & FLAG_LATEST) ||
 			(client->flags & FLAG_ALLOW_RESTORE_MODE) ||
@@ -664,67 +588,14 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 		client->cpid = cpid;
 		client->bdid = bdid;
 		
-		// check device
-		if (is_a10_variant_soc(client->cpid)) {
-			if (client->flags & (FLAG_FETCH_BSEP | FLAG_LOAD_BSEP)) {
-				logger(LL_ERROR, "bsep is not supported in this SoC\n");
-				return -2;
-			}
-		}
-		else if (is_a9_variant_soc(client->cpid)) {
-			if ((client->flags & FLAG_LOAD_BSEP_SHC) && (client->flags & FLAG_LOAD_BSEP_PTE)) {
-				logger(LL_ERROR, "Conflict detected\n");
-				return -2;
-			}
-			if ((client->flags & FLAG_FETCH_BSEP_SHC) && (client->flags & FLAG_FETCH_BSEP_PTE)) {
-				logger(LL_ERROR, "Conflict detected\n");
-				return -2;
-			}
-			if ((client->flags & FLAG_FETCH_BSEP_PTE) && (client->flags & FLAG_LOAD_BSEP_PTE)) {
-				logger(LL_ERROR, "Conflict detected\n");
-				return -2;
-			}
-			if (!(client->flags & FLAG_CHECK_A9)) {
-				logger(LL_ERROR, "No exploit method selected\n");
-				return -2;
-			}
-		}
-		else if (is_a8_variant_soc(client->cpid)) {
-			if ((client->flags & FLAG_LOAD_BSEP_SHC) && (client->flags & FLAG_LOAD_BSEP_PTE)) {
-				logger(LL_ERROR, "Conflict detected\n");
-				return -2;
-			}
-			if ((client->flags & FLAG_FETCH_BSEP_SHC) && (client->flags & FLAG_FETCH_BSEP_PTE)) {
-				logger(LL_ERROR, "Conflict detected\n");
-				return -2;
-			}
-			if ((client->flags & FLAG_FETCH_BSEP_PTE) && (client->flags & FLAG_LOAD_BSEP_PTE)) {
-				logger(LL_ERROR, "Conflict detected\n");
-				return -2;
-			}
-			if (!(client->flags & FLAG_CHECK_A8)) {
-				logger(LL_ERROR, "No exploit method selected\n");
-				return -2;
-			}
-		}
-		else if (is_armv7s_soc(client->cpid)) {
-			if (client->flags & (FLAG_FETCH_BSEP | FLAG_LOAD_BSEP)) {
-				logger(LL_ERROR, "This device does not support SEP/PongoOS.\n");
-				return -2;
-			}
-		}
-		else {
+		if (!is_armv7s_soc(client->cpid)) {
 			logger(LL_ERROR, "Unsupported device (CPID: %04x)\n", client->cpid);
 			return -2;
 		}
 		
 		// check shsh
 		// some modes require fetching from the server, so don't check them yet
-		if (
-			!(client->flags & FLAG_TETHERED) && // !tethered
-			!(client->flags & FLAG_FETCH_BSEP)  // !pongoonly
-			)
-		{
+		if (!(client->flags & FLAG_TETHERED)) {
 			if (!client->use_custom_ticket || !ap_shsh_path) {
 				logger(LL_ERROR, "local shsh not selected\n");
 				return -2;
@@ -819,40 +690,6 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 	}
 	logger(LL_INFO, "Device Product Version: %s\n", (client->device_version) ? client->device_version : "N/A");
 	logger(LL_INFO, "Device Product Build: %s\n", (client->device_build) ? client->device_build : "N/A");
-
-	if (client->flags & FLAG_PWN) {
-#ifdef HAVE_LIMERA1N
-		recovery_client_free(client);
-
-		if (client->mode != MODE_DFU) {
-			logger(LL_ERROR, "Device needs to be in DFU mode for this option.\n");
-			return -1;
-		}
-
-		logger(LL_INFO, "connecting to DFU\n");
-		if (dfu_client_new(client) < 0) {
-			return -1;
-		}
-
-		if (limera1n_is_supported(client->device)) {
-			logger(LL_INFO, "exploiting with limera1n...\n");
-			if (limera1n_exploit(client->device, &client->dfu->client) != 0) {
-				logger(LL_ERROR, "limera1n exploit failed\n");
-				dfu_client_free(client);
-				return -1;
-			}
-			dfu_client_free(client);
-			logger(LL_INFO, "Device should be in pwned DFU state now.\n");
-
-			return 0;
-		}
-		else {
-			dfu_client_free(client);
-			logger(LL_ERROR, "This device is not supported by the limera1n exploit");
-			return -1;
-		}
-#endif
-	}
 
 	if (client->flags & FLAG_LATEST) {
 		char *fwurl = NULL;
@@ -960,24 +797,10 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 	}
 
 	// extract buildmanifest
-	if (client->flags & FLAG_CUSTOM) {
-		logger(LL_INFO, "Extracting Restore.plist from IPSW\n");
-		if (ipsw_extract_restore_plist(client->ipsw, &client->build_manifest) < 0) {
-			logger(LL_ERROR, "Unable to extract Restore.plist from %s. Firmware file might be corrupt.\n", client->ipsw->path);
-			return -1;
-		}
-	} else {
-		logger(LL_INFO, "Extracting BuildManifest from IPSW\n");
-		if (ipsw_extract_build_manifest(client->ipsw, &client->build_manifest, &tss_enabled) < 0) {
-			logger(LL_ERROR, "Unable to extract BuildManifest from %s. Firmware file might be corrupt.\n", client->ipsw->path);
-			return -1;
-		}
-	}
-
-	if (client->flags & FLAG_CUSTOM) {
-		// prevent attempt to sign custom firmware
-		tss_enabled = 0;
-		logger(LL_INFO, "Custom firmware requested; TSS has been disabled.\n");
+	logger(LL_INFO, "Extracting BuildManifest from IPSW\n");
+	if (ipsw_extract_build_manifest(client->ipsw, &client->build_manifest, &tss_enabled) < 0) {
+		logger(LL_ERROR, "Unable to extract BuildManifest from %s. Firmware file might be corrupt.\n", client->ipsw->path);
+		return -1;
 	}
 
 	if (client->mode == MODE_RESTORE) {
@@ -1165,386 +988,6 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 	logger(LL_INFO, "IPSW Product Version: %s\n", client->version);
 	logger(LL_INFO, "IPSW Product Build: %s Major: %d\n", client->build, client->build_major);
 
-#ifdef HAVE_TURDUS_MERULA
-	// check RAMDisk type
-#define RDSK_TYPE_NONE          (0)
-#define RDSK_TYPE_UNION_IOS     (1u << 0)
-#define RDSK_TYPE_UNION_TVOS    (1u << 1)
-#define RDSK_TYPE_DYLDHOOK_IOS  (1u << 2)
-#define RDSK_TYPE_DYLDHOOK_TVOS (1u << 3)
-	if (client->flags & FLAG_DOWNGRADE) {
-		if (is_arm64_soc(client->cpid)) {
-			uint32_t rdsk_type = RDSK_TYPE_NONE;
-			{
-				int is_tvos = is_tvos_with_cpid_bdid(client->cpid, client->bdid);
-				if (client->build_major >= 14) {
-					if (client->build_major == 14 || client->build_major == 15) {
-						if (is_tvos == 0) { // iPhoneOS
-							rdsk_type |= RDSK_TYPE_UNION_IOS;
-						}
-						if (is_tvos == 1) { // tvOS
-							rdsk_type |= RDSK_TYPE_UNION_TVOS;
-						}
-					}
-					else {
-						if (is_tvos == 0) { // iPhoneOS
-							rdsk_type |= RDSK_TYPE_DYLDHOOK_IOS;
-						}
-						if (is_tvos == 1) { // tvOS
-							rdsk_type |= RDSK_TYPE_DYLDHOOK_TVOS;
-						}
-					}
-				}
-			}
-			logger(LL_INFO, "RAMDisk type: 0x%04x\n", rdsk_type);
-			
-			// load RAMDisk
-			if (rdsk_type != 0) {
-				if (gRAMDisk == NULL) {
-					logger(LL_INFO, "Loading overlay ramdisk...\n");
-					size_t ramdisk_length = 0;
-					void* ramdisk_buffer = NULL;
-					if (rdsk_type & RDSK_TYPE_UNION_IOS) {
-						ramdisk_buffer = (void *)union_iphoneos_bin;
-						ramdisk_length = (size_t)union_iphoneos_bin_len;
-					}
-					else if (rdsk_type & RDSK_TYPE_UNION_TVOS) {
-						ramdisk_buffer = (void *)union_tvos_bin;
-						ramdisk_length = (size_t)union_tvos_bin_len;
-					}
-					else if (rdsk_type & RDSK_TYPE_DYLDHOOK_IOS) {
-						ramdisk_buffer = (void *)overlay_iphoneos_bin;
-						ramdisk_length = (size_t)overlay_iphoneos_bin_len;
-					}
-					else if (rdsk_type & RDSK_TYPE_DYLDHOOK_TVOS) {
-						ramdisk_buffer = (void *)overlay_tvos_bin;
-						ramdisk_length = (size_t)overlay_tvos_bin_len;
-					}
-					else {
-						logger(LL_ERROR, "Invalid rdsk_type\n");
-						return -1;
-					}
-					
-					void* rdsk_raw_buffer = NULL;
-					size_t rdsk_raw_length = 0;
-					int _rv = decompress_zstd_buffer((const void *)ramdisk_buffer, (const size_t)ramdisk_length, (size_t)MAX_RAMDISK_SIZE, &rdsk_raw_buffer, &rdsk_raw_length);
-					ramdisk_buffer = NULL;
-					if (_rv != 0) {
-						logger(LL_ERROR, "Decompress failed\n");
-						return -1;
-					}
-					if (rdsk_raw_buffer == NULL) {
-						logger(LL_ERROR, "Out of memory?\n");
-						return -1;
-					}
-					
-					void* tmp_buffer = NULL;
-					int res = posix_memalign(&tmp_buffer, sizeof(uint64_t), rdsk_raw_length);
-					if (res != 0) {
-						logger(LL_ERROR, "memalign failed (reason: %s)", strerror(res));
-						return -1;
-					}
-					if (tmp_buffer == NULL) {
-						logger(LL_ERROR, "Out of memory\n");
-						return -1;
-					}
-					memcpy(tmp_buffer, rdsk_raw_buffer, rdsk_raw_length);
-					free(rdsk_raw_buffer);
-					
-					gRAMDisk = tmp_buffer;
-					gRAMDiskLength = rdsk_raw_length;
-					logger(LL_INFO, "Loaded embedded overlay ramdisk, length %zu\n", gRAMDiskLength);
-				}
-			}
-			
-			// load module and pongo
-			if (gPongoOS == NULL) {
-				logger(LL_INFO, "Loading Pongo...\n");
-				void* pongo_raw_buffer = NULL;
-				size_t pongo_raw_length = 0;
-				if (decompress_zstd_buffer((const void *)Pongo_bin, (const size_t)Pongo_bin_len, (size_t)MAX_PONGO_SIZE, &pongo_raw_buffer, &pongo_raw_length) != 0) {
-					logger(LL_ERROR, "Decompress failed\n");
-					return -1;
-				}
-				if (pongo_raw_buffer == NULL) {
-					logger(LL_ERROR, "Out of memory?\n");
-					return -1;
-				}
-				
-				void* tmp_buffer = NULL;
-				int res = posix_memalign(&tmp_buffer, sizeof(uint64_t), pongo_raw_length);
-				if (res != 0) {
-					logger(LL_ERROR, "memalign failed (reason: %s)", strerror(res));
-					free(pongo_raw_buffer);
-					return -1;
-				}
-				if (tmp_buffer == NULL) {
-					logger(LL_ERROR, "Out of memory\n");
-					free(pongo_raw_buffer);
-					return -1;
-				}
-				memcpy(tmp_buffer, pongo_raw_buffer, pongo_raw_length);
-				free(pongo_raw_buffer);
-				
-				gPongoOS = tmp_buffer;
-				gPongoOSLength = pongo_raw_length;
-				logger(LL_INFO, "Loaded embedded Pongo, length %zu\n", gPongoOSLength);
-			}
-			
-			if (gSEPRacer == NULL) {
-				logger(LL_INFO, "Loading sep_racer...\n");
-				void* sepracer_raw_buffer = NULL;
-				size_t sepracer_raw_length = 0;
-				if (decompress_zstd_buffer((const void *)sep_racer_bin, (const size_t)sep_racer_bin_len, (size_t)MAX_MODULE_SIZE, &sepracer_raw_buffer, &sepracer_raw_length) != 0) {
-					logger(LL_ERROR, "Decompress failed\n");
-					return -1;
-				}
-				if (sepracer_raw_buffer == NULL) {
-					logger(LL_ERROR, "Out of memory?\n");
-					return -1;
-				}
-				
-				void* tmp_buffer = NULL;
-				int res = posix_memalign(&tmp_buffer, sizeof(uint64_t), sepracer_raw_length);
-				if (res != 0) {
-					logger(LL_ERROR, "memalign failed (reason: %s)", strerror(res));
-					free(sepracer_raw_buffer);
-					return -1;
-				}
-				if (tmp_buffer == NULL) {
-					logger(LL_ERROR, "Out of memory\n");
-					free(sepracer_raw_buffer);
-					return -1;
-				}
-				memcpy(tmp_buffer, sepracer_raw_buffer, sepracer_raw_length);
-				free(sepracer_raw_buffer);
-				
-				gSEPRacer = tmp_buffer;
-				gSEPRacerLength = sepracer_raw_length;
-				logger(LL_INFO, "Loaded embedded sep_racer module, length %zu\n", gSEPRacerLength);
-			}
-			
-			if (gKPF == NULL) {
-				logger(LL_INFO, "Loading kpf...\n");
-				void* kpf_raw_buffer = NULL;
-				size_t kpf_raw_length = 0;
-				if (decompress_zstd_buffer((const void *)kpf_bin, (const size_t)kpf_bin_len, (size_t)MAX_MODULE_SIZE, &kpf_raw_buffer, &kpf_raw_length) != 0) {
-					logger(LL_ERROR, "Decompress failed\n");
-					return -1;
-				}
-				if (kpf_raw_buffer == NULL) {
-					logger(LL_ERROR, "Out of memory?\n");
-					return -1;
-				}
-				
-				void* tmp_buffer = NULL;
-				int res = posix_memalign(&tmp_buffer, sizeof(uint64_t), kpf_raw_length);
-				if (res != 0) {
-					logger(LL_ERROR, "memalign failed (reason: %s)", strerror(res));
-					free(kpf_raw_buffer);
-					return -1;
-				}
-				if (tmp_buffer == NULL) {
-					logger(LL_ERROR, "Out of memory\n");
-					free(kpf_raw_buffer);
-					return -1;
-				}
-				memcpy(tmp_buffer, kpf_raw_buffer, kpf_raw_length);
-				free(kpf_raw_buffer);
-				
-				gKPF = tmp_buffer;
-				gKPFLength = kpf_raw_length;
-				logger(LL_INFO, "Loaded embedded kpf module, length %zu\n", gKPFLength);
-			}
-			
-			if (gCPF == NULL) {
-				logger(LL_INFO, "Loading cpf...\n");
-				void* cpf_raw_buffer = NULL;
-				size_t cpf_raw_length = 0;
-				if (decompress_zstd_buffer((const void *)cpf_bin, (const size_t)cpf_bin_len, (size_t)MAX_MODULE_SIZE, &cpf_raw_buffer, &cpf_raw_length) != 0) {
-					logger(LL_ERROR, "Decompress failed\n");
-					return -1;
-				}
-				if (cpf_raw_buffer == NULL) {
-					logger(LL_ERROR, "Out of memory?\n");
-					return -1;
-				}
-				
-				void* tmp_buffer = NULL;
-				int res = posix_memalign(&tmp_buffer, sizeof(uint64_t), cpf_raw_length);
-				if (res != 0) {
-					logger(LL_ERROR, "memalign failed (reason: %s)", strerror(res));
-					free(cpf_raw_buffer);
-					return -1;
-				}
-				if (tmp_buffer == NULL) {
-					logger(LL_ERROR, "Out of memory\n");
-					free(cpf_raw_buffer);
-					return -1;
-				}
-				memcpy(tmp_buffer, cpf_raw_buffer, cpf_raw_length);
-				free(cpf_raw_buffer);
-				
-				gCPF = tmp_buffer;
-				gCPFLength = cpf_raw_length;
-				logger(LL_INFO, "Loaded embedded cpf module, length %zu\n", gCPFLength);
-			}
-			
-			// check pongo
-			{
-				logger(LL_INFO, "Checking PongoOS image...\n");
-				int found = 0;
-				const uint64_t magicval = PONGO_MAGIC_VALUE; // 0x1337cafebabe4100uLL
-				uint8_t* cur = gPongoOS;
-				const uint8_t* end = (uint8_t*)(cur + gPongoOSLength - sizeof(uint64_t));
-				while (cur <= end) {
-					if (read_u64_le(cur) == magicval) {
-						found = 1;
-						break;
-					}
-					cur += sizeof(uint64_t);
-				}
-				if (found == 0) {
-					logger(LL_ERROR, "Incompatible PongoOS image\n");
-					return -1;
-				}
-			}
-			
-			// check module flags
-			uint64_t kpf_flag = 0;
-			uint64_t cpf_flag = 0;
-			uint64_t sep_racer_flag = 0;
-			uint64_t ramdisk_flag = 0;
-			
-			logger(LL_INFO, "Loading image flags...\n");
-			
-			if (rdsk_type != 0) {
-				if (
-					load_rdsk_flag(
-								   (const uint8_t*)gRAMDisk,
-								   gRAMDiskLength,
-								   (rdsk_type & (RDSK_TYPE_UNION_IOS | RDSK_TYPE_UNION_TVOS)) ? 0x2222 : 0x1111,
-								   "RAMDisk.dmg",
-								   &ramdisk_flag
-								   )
-					)
-				{
-					logger(LL_ERROR, "Image flag not found: %s\n", "RAMDisk.dmg");
-					return -2;
-				}
-			}
-			if (load_module_flag((const uint8_t*)gCPF, gCPFLength, 0xAAAA000000009990uLL, "cpf", &cpf_flag)) {
-				logger(LL_ERROR, "Image flag not found: %s\n", "cpf");
-				return -2;
-			}
-			if (load_module_flag((const uint8_t*)gKPF, gKPFLength, 0xBBBB000000009990uLL, "kpf", &kpf_flag)) {
-				logger(LL_ERROR, "Image flag not found: %s\n", "kpf");
-				return -2;
-			}
-			if (load_module_flag((const uint8_t*)gSEPRacer, gSEPRacerLength, 0xCCCC000000009990uLL, "sep_racer", &sep_racer_flag)) {
-				logger(LL_ERROR, "Image flag not found: %s\n", "sep_racer");
-				return -2;
-			}
-			client->kpf_flag = kpf_flag;
-			client->cpf_flag = cpf_flag;
-			client->sep_racer_flag = sep_racer_flag;
-			client->ramdisk_flag = ramdisk_flag;
-			
-			// check module compatibility
-			logger(LL_INFO, "Checking image flags...\n");
-			int module_unsupported = 0;
-			uint64_t vflag = convert_cpid_bdid_to_plat_vflag(client->cpid, client->bdid);
-			int is_tvos = is_tvos_with_cpid_bdid(client->cpid, client->bdid);
-			if (is_tvos == -1) {
-				logger(LL_ERROR, "Unknown bdid (BDID: 0x%02x)\n", (uint8_t)client->bdid);
-				module_unsupported = 1;
-			}
-			if (rdsk_type != 0) {
-				if (0 == check_vflag(client->ramdisk_flag, vflag)) {
-					logger(LL_ERROR, "Found unsupported module (name: %s)\n", "RAMDisk.dmg");
-					module_unsupported = 1;
-				}
-			}
-			if (!is_a8_variant_soc(client->cpid)) {
-				if (0 == check_vflag(client->cpf_flag, vflag)) {
-					logger(LL_ERROR, "Found unsupported module (name: %s)\n", "cpf");
-					module_unsupported = 1;
-				}
-			}
-			if (0 == check_vflag(client->kpf_flag, vflag)) {
-				logger(LL_ERROR, "Found unsupported module (name: %s)\n", "kpf");
-				module_unsupported = 1;
-			}
-			if (0 == check_vflag(client->sep_racer_flag, vflag)) {
-				logger(LL_ERROR, "Found unsupported module (name: %s)\n", "sep_racer");
-				module_unsupported = 1;
-			}
-			
-			if (module_unsupported) {
-				logger(LL_ERROR, "Unsupported device (CPID: %04x)\n", client->cpid);
-				return -2;
-			}
-			
-			// check bsep
-			if (client->flags & FLAG_FETCH_BSEP) {
-				if (is_a10_variant_soc(client->cpid)) {
-					logger(LL_ERROR, "This device does not requires SEP ciphertext block\n");
-					return -2;
-				}
-			}
-			if (client->sep_shellcode_block && client->sep_shellcode_block_len) {
-				if (client->sep_shellcode_block_len == 0x80) {
-					logger(LL_INFO, "Found old style block!\n");
-					uint8_t zero[0x10] = { 0 };
-					memset(zero, 0, 0x10);
-					if (memcmp(client->sep_shellcode_block + 0x30, zero, 0x10) || memcmp(client->sep_shellcode_block + 0x70, zero, 0x10)) {
-						logger(LL_ERROR, "block type check failed!\n");
-						return -2;
-					}
-				}
-				else {
-					logger(LL_INFO, "Checking block type...\n");
-					bool _bsep_is_valid = 0;
-					sep_block_t* bsep = (sep_block_t*)client->sep_shellcode_block;
-					uint32_t myType = 0;
-					if (get_bsep_type(bsep, &myType) == false) {
-						logger(LL_ERROR, "block type check failed!\n");
-						return -2;
-					}
-					if ((myType == BSEP_TYPE_SHC) && (client->flags & FLAG_LOAD_BSEP_SHC)) {
-						_bsep_is_valid = 1;
-					}
-					if ((myType == BSEP_TYPE_PTE) && (client->flags & FLAG_LOAD_BSEP_PTE)) {
-						_bsep_is_valid = 1;
-					}
-					if (!_bsep_is_valid) {
-						logger(LL_ERROR, "Invalid block type!\n");
-						return -2;
-					}
-				}
-			}
-			
-			if (client->flags & FLAG_TETHERED) {
-				logger(LL_INFO, "Checking image version flags...\n");
-				int is_tvos = is_tvos_with_cpid_bdid(client->cpid, client->bdid);
-				uint64_t vflag = convert_build_to_ios_vflag(client->build_major);
-				if (client->build_major >= 14) {
-					if (0 == check_vflag(client->kpf_flag, vflag)) {
-						logger(LL_ERROR, "Found unsupported module (name: %s)\n", "kpf");
-						return -1;
-					}
-					if (0 == check_vflag(client->ramdisk_flag, vflag)) {
-						logger(LL_ERROR, "Found unsupported module (name: %s)\n", "RAMDisk.dmg");
-						return -1;
-					}
-				}
-			}
-		}
-		
-		logger(LL_DEBUG, "Found supported device (CPID: %04x)\n", client->cpid);
-	}
-#endif
-
 	client->image4supported = is_image4_supported(client);
 	logger(LL_INFO, "Device supports Image4: %s\n", (client->image4supported) ? "true" : "false");
 
@@ -1552,160 +995,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 	client->tss = NULL;
 	plist_t build_identity = NULL;
 	int build_identity_needs_free = 0;
-	if (client->flags & FLAG_CUSTOM) {
-		build_identity = plist_new_dict();
-		build_identity_needs_free = 1;
-		{
-			plist_t node;
-			plist_t comp;
-			plist_t inf;
-			plist_t manifest;
-
-			char tmpstr[256];
-			char p_all_flash[128];
-			char lcmodel[8];
-			strcpy(lcmodel, client->device->hardware_model);
-			int x = 0;
-			while (lcmodel[x]) {
-				lcmodel[x] = tolower(lcmodel[x]);
-				x++;
-			}
-
-			snprintf(p_all_flash, sizeof(p_all_flash), "Firmware/all_flash/all_flash.%s.%s", lcmodel, "production");
-			strcpy(tmpstr, p_all_flash);
-			strcat(tmpstr, "/manifest");
-
-			// get all_flash file manifest
-			char *files[16];
-			void *fmanifest = NULL;
-			size_t msize = 0;
-			if (ipsw_extract_to_memory(client->ipsw, tmpstr, &fmanifest, &msize) < 0) {
-				logger(LL_ERROR, "could not extract %s from IPSW\n", tmpstr);
-				free(build_identity);
-				return -1;
-			}
-
-			char *tok = strtok(fmanifest, "\r\n");
-			int fc = 0;
-			while (tok) {
-				files[fc++] = strdup(tok);
-				if (fc >= 16) {
-					break;
-				}
-				tok = strtok(NULL, "\r\n");
-			}
-			free(fmanifest);
-
-			manifest = plist_new_dict();
-
-			for (x = 0; x < fc; x++) {
-				inf = plist_new_dict();
-				strcpy(tmpstr, p_all_flash);
-				strcat(tmpstr, "/");
-				strcat(tmpstr, files[x]);
-				plist_dict_set_item(inf, "Path", plist_new_string(tmpstr));
-				comp = plist_new_dict();
-				plist_dict_set_item(comp, "Info", inf);
-				const char* compname = get_component_name(files[x]);
-				if (compname) {
-					plist_dict_set_item(manifest, compname, comp);
-					if (!strncmp(files[x], "DeviceTree", 10)) {
-						plist_dict_set_item(manifest, "RestoreDeviceTree", plist_copy(comp));
-					}
-				} else {
-					logger(LL_WARNING, "Unhandled component %s\n", files[x]);
-					plist_free(comp);
-				}
-				free(files[x]);
-				files[x] = NULL;
-			}
-
-			// add iBSS
-			snprintf(tmpstr, sizeof(tmpstr), "Firmware/dfu/iBSS.%s.%s.dfu", lcmodel, "RELEASE");
-			inf = plist_new_dict();
-			plist_dict_set_item(inf, "Path", plist_new_string(tmpstr));
-			comp = plist_new_dict();
-			plist_dict_set_item(comp, "Info", inf);
-			plist_dict_set_item(manifest, "iBSS", comp);
-
-			// add iBEC
-			snprintf(tmpstr, sizeof(tmpstr), "Firmware/dfu/iBEC.%s.%s.dfu", lcmodel, "RELEASE");
-			inf = plist_new_dict();
-			plist_dict_set_item(inf, "Path", plist_new_string(tmpstr));
-			comp = plist_new_dict();
-			plist_dict_set_item(comp, "Info", inf);
-			plist_dict_set_item(manifest, "iBEC", comp);
-
-			// add kernel cache
-			plist_t kdict = NULL;
-
-			node = plist_dict_get_item(client->build_manifest, "KernelCachesByTarget");
-			if (node && (plist_get_node_type(node) == PLIST_DICT)) {
-				char tt[4];
-				strncpy(tt, lcmodel, 3);
-				tt[3] = 0;
-				kdict = plist_dict_get_item(node, tt);
-			} else {
-				// Populated in older iOS IPSWs
-				kdict = plist_dict_get_item(client->build_manifest, "RestoreKernelCaches");
-			}
-			if (kdict && (plist_get_node_type(kdict) == PLIST_DICT)) {
-				plist_t kc = plist_dict_get_item(kdict, "Release");
-				if (kc && (plist_get_node_type(kc) == PLIST_STRING)) {
-					inf = plist_new_dict();
-					plist_dict_set_item(inf, "Path", plist_copy(kc));
-					comp = plist_new_dict();
-					plist_dict_set_item(comp, "Info", inf);
-					plist_dict_set_item(manifest, "KernelCache", comp);
-					plist_dict_set_item(manifest, "RestoreKernelCache", plist_copy(comp));
-				}
-			}
-
-			// add ramdisk
-			node = plist_dict_get_item(client->build_manifest, "RestoreRamDisks");
-			if (node && (plist_get_node_type(node) == PLIST_DICT)) {
-				plist_t rd = plist_dict_get_item(node, (client->flags & FLAG_ERASE) ? "User" : "Update");
-				// if no "Update" ram disk entry is found try "User" ram disk instead
-				if (!rd && !(client->flags & FLAG_ERASE)) {
-					rd = plist_dict_get_item(node, "User");
-					// also, set the ERASE flag since we actually change the restore variant
-					client->flags |= FLAG_ERASE;
-				}
-				if (rd && (plist_get_node_type(rd) == PLIST_STRING)) {
-					inf = plist_new_dict();
-					plist_dict_set_item(inf, "Path", plist_copy(rd));
-					comp = plist_new_dict();
-					plist_dict_set_item(comp, "Info", inf);
-					plist_dict_set_item(manifest, "RestoreRamDisk", comp);
-				}
-			}
-
-			// add OS filesystem
-			node = plist_dict_get_item(client->build_manifest, "SystemRestoreImages");
-			if (!node) {
-				logger(LL_ERROR, "missing SystemRestoreImages in Restore.plist\n");
-			}
-			plist_t os = plist_dict_get_item(node, "User");
-			if (!os) {
-				logger(LL_ERROR, "missing filesystem in Restore.plist\n");
-			} else {
-				inf = plist_new_dict();
-				plist_dict_set_item(inf, "Path", plist_copy(os));
-				comp = plist_new_dict();
-				plist_dict_set_item(comp, "Info", inf);
-				plist_dict_set_item(manifest, "OS", comp);
-			}
-
-			// add info
-			inf = plist_new_dict();
-			plist_dict_set_item(inf, "RestoreBehavior", plist_new_string((client->flags & FLAG_ERASE) ? "Erase" : "Update"));
-			plist_dict_set_item(inf, "Variant", plist_new_string((client->flags & FLAG_ERASE) ? "Customer " RESTORE_VARIANT_ERASE_INSTALL : "Customer " RESTORE_VARIANT_UPGRADE_INSTALL));
-			plist_dict_set_item(build_identity, "Info", inf);
-
-			// finally add manifest
-			plist_dict_set_item(build_identity, "Manifest", manifest);
-		}
-	} else if (client->restore_variant) {
+	if (client->restore_variant) {
 		build_identity = build_manifest_get_build_identity_for_model_with_variant(client->build_manifest, client->device->hardware_model, client->restore_variant, 1);
 	} else if (client->flags & FLAG_ERASE) {
 		build_identity = build_manifest_get_build_identity_for_model_with_variant(client->build_manifest, client->device->hardware_model, RESTORE_VARIANT_ERASE_INSTALL, 0);
@@ -1727,174 +1017,26 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 
 #ifdef HAVE_TURDUS_MERULA
 	bool has_bb = false;
-	bool has_se = false;
 #define USE_SIGNED_BBFW (1u << 0)
-#define USE_SIGNED_SEFW (1u << 1)
-#define USE_SIGNED_RSEP (1u << 2)
 #define USE_SIGNED_BASE (1u << 3)
 	uint32_t fw_component_flag = 0;
 	uint32_t specific_fw_component_flag = 0;
 	if (client->flags & FLAG_DOWNGRADE) {
-		// check cryptex1 ticket
-		if (
-			!(client->flags & FLAG_TETHERED) && // !tethered
-			!(client->flags & FLAG_FETCH_BSEP)  // !pongoonly
-			)
-		{
-			if (build_identity_has_component(build_identity, "Cryptex1,AppOS") || build_identity_has_component(build_identity, "Cryptex1,SystemOS")) {
-				// need 'Cryptex1,Ticket'
-				int _found = 0;
-				logger(LL_DEBUG, "Checking Cryptex1,Ticket\n");
-				if (plist_dict_get_item(client->local_shsh, "Cryptex1,Ticket")) {
-					_found = 1;
-				}
-				else {
-					plist_t cryptex1_tss = plist_dict_get_item(client->local_shsh, "cryptexTicket");
-					if (cryptex1_tss) {
-						if (plist_dict_get_item(cryptex1_tss, "Cryptex1,Ticket")) {
-							_found = 1;
-						}
-					}
-				}
-				if (_found != 1) {
-					logger(LL_ERROR, "no Cryptex1,Ticket\n");
-					return -1;
-				}
-				
-				logger(LL_DEBUG, "Checking cryptexSeed\n");
-				plist_t cnonce_node = plist_dict_get_item(client->local_shsh, "cryptexSeed");
-				if (cnonce_node) {
-					char* cstr = NULL;
-					plist_get_string_val(cnonce_node, &cstr);
-					if (cstr) {
-						void* cstr_ptr = (void*)cstr;
-						if (strlen(cstr) != 34) {
-							logger(LL_ERROR, "Wrong nonce seed size\n");
-							return -1;
-						}
-						if (!(cstr[0] == '0') || !(cstr[1] == 'x')) {
-							logger(LL_ERROR, "Wrong nonce seed type\n");
-							return -1;
-						}
-						cstr += 2;
-						client->cryptex1_nonce_seed = strdup(cstr);
-						logger(LL_INFO, "cryptexSeed = %s\n", client->cryptex1_nonce_seed);
-						_found = 2;
-						free(cstr_ptr);
-						cstr = NULL;
-						cstr_ptr = NULL;
-					}
-				}
-				if (_found != 2) {
-					logger(LL_ERROR, "no cryptexSeed\n");
-					return -1;
-				}
-				if (0 == check_vflag(client->cpf_flag, convert_build_to_ios_vflag(client->build_major))) {
-					logger(LL_ERROR, "Found unsupported module (name: %s)\n", "cpf");
-					return -1;
-				}
-			}
-		}
-		
 		/* check firmware components */
 		if (build_identity_has_component(build_identity, "BasebandFirmware")) {
 			has_bb = true;
-			
-			int is_MDM9645 = 0;
-			if (
-				(client->cpid == 0x8010 && ((client->bdid == 0x08) || (client->bdid == 0x0A))) ||
-				(client->cpid == 0x8011 && ((client->bdid == 0x0E) || (client->bdid == 0x06)))
-				)
-			{
-				is_MDM9645 = 1;
-			}
-			
-			/* If the latest baseband is not compatible with the firmware, please mark it here. */
-			int is_bb_incompatible = 0;
-			if (is_MDM9645 && client->build_major == 14) {
-				is_bb_incompatible = 1;
-			}
-			
-			if (is_bb_incompatible) {
-				if (client->flags & FLAG_INTERACTIVE) {
-					char input[64];
-					printf("############################ [ WARNING ] #############################\n"
-						   "# You are trying to restore to a version that does not have baseband #\n"
-						   "# compatibility. Restore might work, but it will not enable cellular #\n"
-						   "# and will mean you will have baseband issues.                       #\n"
-						   "# If you want to continue, please type YES and press ENTER.          #\n"
-						   "######################################################################\n");
-					while (1) {
-						printf("> ");
-						fflush(stdout);
-						fflush(stdin);
-						input[0] = '\0';
-						get_user_input(input, 63, 0);
-						if (client->flags & FLAG_QUIT) {
-							return -1;
-						}
-						if (*input != '\0' && !strcmp(input, "YES")) {
-							break;
-						}
-						else {
-							printf("Invalid input. Please type YES or hit CTRL+C to abort.\n");
-							continue;
-						}
-					}
-				}
-			}
-		}
-		
-		if (build_identity_has_component(build_identity, "SE,UpdatePayload") || build_identity_has_component(build_identity, "SE,Firmware")) {
-			has_se = true;
 		}
 		
 		// BBFW
-		if (
-			has_bb &&
-			!(client->flags & FLAG_FETCH_BSEP)  // !pongoonly
-			)
-		{
+		if (has_bb) {
 			fw_component_flag |= USE_SIGNED_BBFW;
 			if (client->bbfw.data && client->bbfw.length && client->bbfw.manifest) {
 				specific_fw_component_flag |= USE_SIGNED_BBFW;
 			}
 		}
 		
-		// SEFW
-		if (
-			has_se &&
-			!(client->flags & FLAG_FETCH_BSEP)  // !pongoonly
-			)
-		{
-			fw_component_flag |= USE_SIGNED_SEFW;
-			if (client->sefw.data && client->sefw.length && client->sefw.manifest) {
-				specific_fw_component_flag |= USE_SIGNED_SEFW;
-			}
-		}
-		
-		// RSEP
-		if (is_arm64_soc(client->cpid)) {
-			if (
-				is_a10_variant_soc(client->cpid) ||    // A10 variant
-				(client->flags & FLAG_LOAD_BSEP_SHC) || // do fwload race
-				(client->flags & FLAG_TETHERED)        // tethered
-				)
-			{
-				fw_component_flag |= USE_SIGNED_RSEP;
-				if (client->rsep.data && client->rsep.length && client->rsep.manifest) {
-					specific_fw_component_flag |= USE_SIGNED_RSEP;
-				}
-			}
-		}
-		
 		// Base
-		if (
-			(client->build_major <= 13 && have_arm64_second_stage_iboot(client->cpid)) || // ios <= 9
-			(client->flags & FLAG_TETHERED) || // tethered
-			(client->flags & FLAG_FETCH_BSEP)  // pongoonly
-			)
-		{
+		if (client->flags & FLAG_TETHERED) {
 			fw_component_flag |= USE_SIGNED_BASE;
 			if (client->base.manifest) { // no data/length
 				specific_fw_component_flag |= USE_SIGNED_BASE;
@@ -1916,18 +1058,6 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 			char fwselectname[256] = "";
 			if (fw_component_flag & USE_SIGNED_BBFW) {
 				strcat(fwselectname, "Baseband");
-			}
-			if (fw_component_flag & USE_SIGNED_SEFW) {
-				if (fwselectname[0] != '\0') {
-					strcat(fwselectname, "/");
-				}
-				strcat(fwselectname, "SE");
-			}
-			if (fw_component_flag & USE_SIGNED_RSEP) {
-				if (fwselectname[0] != '\0') {
-					strcat(fwselectname, "/");
-				}
-				strcat(fwselectname, "RestoreSEP");
 			}
 			if (fw_component_flag & USE_SIGNED_BASE) {
 				if (fwselectname[0] != '\0') {
@@ -2064,12 +1194,6 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 				if (fw_component_flag & USE_SIGNED_BBFW) {
 					plist_from_bin((const char *)manifest_bin, manifest_len, &client->bbfw.manifest);
 				}
-				if (fw_component_flag & USE_SIGNED_SEFW) {
-					plist_from_bin((const char *)manifest_bin, manifest_len, &client->sefw.manifest);
-				}
-				if (fw_component_flag & USE_SIGNED_RSEP) {
-					plist_from_bin((const char *)manifest_bin, manifest_len, &client->rsep.manifest);
-				}
 				if (fw_component_flag & USE_SIGNED_BASE) {
 					plist_from_bin((const char *)manifest_bin, manifest_len, &client->base.manifest);
 				}
@@ -2077,12 +1201,6 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 			else {
 				if (fw_component_flag & USE_SIGNED_BBFW) {
 					plist_from_xml((const char *)manifest_bin, manifest_len, &client->bbfw.manifest);
-				}
-				if (fw_component_flag & USE_SIGNED_SEFW) {
-					plist_from_xml((const char *)manifest_bin, manifest_len, &client->sefw.manifest);
-				}
-				if (fw_component_flag & USE_SIGNED_RSEP) {
-					plist_from_xml((const char *)manifest_bin, manifest_len, &client->rsep.manifest);
 				}
 				if (fw_component_flag & USE_SIGNED_BASE) {
 					plist_from_xml((const char *)manifest_bin, manifest_len, &client->base.manifest);
@@ -2092,18 +1210,6 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 			if (fw_component_flag & USE_SIGNED_BBFW) {
 				if (!client->bbfw.manifest) {
 					logger(LL_ERROR, "Could not allocate BuildManifest for BasebandFirmware\n");
-					return -1;
-				}
-			}
-			if (fw_component_flag & USE_SIGNED_SEFW) {
-				if (!client->sefw.manifest) {
-					logger(LL_ERROR, "Could not allocate BuildManifest for SE Firmware\n");
-					return -1;
-				}
-			}
-			if (fw_component_flag & USE_SIGNED_RSEP) {
-				if (!client->rsep.manifest) {
-					logger(LL_ERROR, "Could not allocate BuildManifest for RestoreSEP\n");
 					return -1;
 				}
 			}
@@ -2138,52 +1244,6 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 			}
 		}
 		
-		// SEFW
-		if (fw_component_flag & USE_SIGNED_SEFW) {
-			// load identity
-			if (get_identity_for_component(client, &client->sefw) != 0) {
-				logger(LL_ERROR, "Unable to find a matching build identity for SE Firmware\n");
-				if (fragment) {
-					fragmentzip_close(fragment);
-				}
-				return -1;
-			}
-			// download fw
-			logger(LL_INFO, "SE Firmware manifest information\n");
-			build_identity_print_information(client->sefw.identity);
-			
-			if (download_component_by_name(fragment, "SE,UpdatePayload", "SE,Firmware", &client->sefw) != 0) {
-				logger(LL_ERROR, "Unable to download SE Firmware\n");
-				if (fragment) {
-					fragmentzip_close(fragment);
-				}
-				return -1;
-			}
-		}
-		
-		// RSEP
-		if (fw_component_flag & USE_SIGNED_RSEP) {
-			// load identity
-			if (get_identity_for_component(client, &client->rsep) != 0) {
-				logger(LL_ERROR, "Unable to find a matching build identity for RestoreSEP\n");
-				if (fragment) {
-					fragmentzip_close(fragment);
-				}
-				return -1;
-			}
-			// download fw
-			logger(LL_INFO, "RestoreSEP manifest information\n");
-			build_identity_print_information(client->rsep.identity);
-			
-			if (download_component_by_name(fragment, "RestoreSEP", NULL, &client->rsep) != 0) {
-				logger(LL_ERROR, "Unable to download RestoreSEP\n");
-				if (fragment) {
-					fragmentzip_close(fragment);
-				}
-				return -1;
-			}
-		}
-		
 		// Base
 		if (fw_component_flag & USE_SIGNED_BASE) {
 			// load identity
@@ -2197,16 +1257,6 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 			
 			logger(LL_INFO, "Base Firmware manifest information\n");
 			build_identity_print_information(client->base.identity);
-			
-			if (client->build_major <= 13 && have_arm64_second_stage_iboot(client->cpid)) { // ios <= 9
-				if (download_component_by_name(fragment, "iBSS", NULL, &client->base) != 0) {
-					logger(LL_ERROR, "Unable to download iBSS\n");
-					if (fragment) {
-						fragmentzip_close(fragment);
-					}
-					return -1;
-				}
-			}
 			
 			if (client->flags & FLAG_TETHERED) { // tethered
 #define DL_FW_COMP(name) { \
@@ -2274,17 +1324,12 @@ logger(LL_DEBUG, "%s length: %zu\n", #name, client->t_##name.im4p.length); \
 				DL_FW_COMP(iBoot);
 				DL_FW_COMP(AppleLogo);
 				DL_FW_COMP(RecoveryMode);
-				if (client->device->product_type && strncmp(client->device->product_type, "AppleTV", 7) == 0) {
-					// AppleTV
-				}
-				else {
-					DL_FW_COMP(BatteryCharging0);
-					DL_FW_COMP(BatteryCharging1);
-					DL_FW_COMP(BatteryFull);
-					DL_FW_COMP(BatteryLow0);
-					DL_FW_COMP(BatteryLow1);
-					DL_FW_COMP(BatteryPlugin);
-				}
+				DL_FW_COMP(BatteryCharging0);
+				DL_FW_COMP(BatteryCharging1);
+				DL_FW_COMP(BatteryFull);
+				DL_FW_COMP(BatteryLow0);
+				DL_FW_COMP(BatteryLow1);
+				DL_FW_COMP(BatteryPlugin);
 			}
 		}
 	
@@ -2297,72 +1342,13 @@ logger(LL_DEBUG, "%s length: %zu\n", #name, client->t_##name.im4p.length); \
 		int is_supported_version = 0;
 		if (
 			client->build_major == 10 || // iOS 6
+			client->build_major == 11 || // iOS 7
+			client->build_major == 12 || // iOS 8
 			client->build_major == 13 || // iOS 9
-			client->build_major == 14 || // iOS 10
-			client->build_major == 15 || // iOS 11
-			client->build_major == 17 || // iOS/iPadOS 13
-			client->build_major == 18 || // iOS/iPadOS 14
-			client->build_major == 19 || // iOS/iPadOS 15
-			client->build_major == 20 || // iPadOS 16
-			client->build_major == 21    // iPadOS 17
+			client->build_major == 14    // iOS 10
 			)
 		{
 			is_supported_version = 1;
-		}
-		
-		// iOS 7
-		if (client->build_major == 11) {
-			// DEBUG: pass
-		}
-		
-		// iOS 8
-		if (client->build_major == 12) {
-			// DEBUG: pass
-		}
-		
-		// iOS 12
-		if (client->build_major == 16) {
-			if (
-				strncmp(client->version, "12.0", 4) == 0 ||
-				strncmp(client->version, "12.1", 4) == 0 ||
-				strncmp(client->version, "12.2", 4) == 0 ||
-				strncmp(client->version, "12.3", 4) == 0 ||
-				strncmp(client->version, "12.4", 4) == 0
-				)
-			{
-				is_supported_version = 1;
-			}
-		}
-		
-		// iPadOS 18
-		if (client->build_major == 22) {
-			if (
-				strncmp(client->version, "18.0", 4) == 0 ||
-				strncmp(client->version, "18.1", 4) == 0 ||
-				strncmp(client->version, "18.2", 4) == 0 ||
-				strncmp(client->version, "18.3", 4) == 0 ||
-				strncmp(client->version, "18.4", 4) == 0 ||
-				strncmp(client->version, "18.5", 4) == 0 ||
-				strncmp(client->version, "18.6", 4) == 0 ||
-				strncmp(client->version, "18.7", 4) == 0
-				)
-			{
-				is_supported_version = 1;
-			}
-		}
-		
-		// tvOS 26
-		if (client->build_major == 23) {
-			if (
-				strncmp(client->version, "26.0", 4) == 0 ||
-				strncmp(client->version, "26.1", 4) == 0 ||
-				strncmp(client->version, "26.2", 4) == 0 ||
-				strncmp(client->version, "26.3", 4) == 0 ||
-				strncmp(client->version, "26.4", 4) == 0
-				)
-			{
-				is_supported_version = 1;
-			}
 		}
 		
 		if (!is_supported_version) {
@@ -2434,48 +1420,6 @@ logger(LL_DEBUG, "%s length: %zu\n", #name, client->t_##name.im4p.length); \
 #endif
 	}
 
-#ifdef HAVE_TURDUS_MERULA
-	if (
-		(client->flags & FLAG_DOWNGRADE) &&
-		is_arm64_soc(client->cpid) &&
-		(client->flags & FLAG_FETCH_BSEP_PTE) &&
-		!(client->flags & FLAG_LOAD_BSEP_SHC)
-		)
-	{
-		if (is_a8_variant_soc(client->cpid)) {
-			// DEBUG: PASS
-		}
-		else {
-			logger(LL_ERROR, "This option is currently not supported in this version.\n");
-			return -1;
-		}
-		// TODO: deprecated
-		if (client->flags & FLAG_INTERACTIVE) {
-			char input[64];
-			printf("################################ [ WARNING ] #################################\n"
-				   "# This mode writes to memory beyond TZ bounds, but there are no guarantees   #\n"
-				   "# that these writes are safe.                                                #\n"
-				   "# If you want to continue, please type YES and press ENTER.                  #\n"
-				   "##############################################################################\n");
-			while (1) {
-				printf("> ");
-				fflush(stdout);
-				fflush(stdin);
-				input[0] = '\0';
-				get_user_input(input, 63, 0);
-				if (client->flags & FLAG_QUIT) {
-					return -1;
-				}
-				if (*input != '\0' && !strcmp(input, "YES")) {
-					break;
-				} else {
-					printf("Invalid input. Please type YES or hit CTRL+C to abort.\n");
-					continue;
-				}
-			}
-		}
-	}
-#endif
 	idevicerestore_progress(client, RESTORE_STEP_PREPARE, 0.0);
 
 	/* check if all components we need are actually there */
@@ -2505,12 +1449,7 @@ logger(LL_DEBUG, "%s length: %zu\n", #name, client->t_##name.im4p.length); \
 		}
 	}
 
-	if (
-		needs_os_extraction && !(client->flags & FLAG_SHSHONLY)
-#ifdef HAVE_TURDUS_MERULA
-		&& !(client->flags & FLAG_FETCH_BSEP)
-#endif
-		) {
+	if (needs_os_extraction && !(client->flags & FLAG_SHSHONLY)) {
 		char* tmpf = NULL;
 		struct stat st;
 		if (client->cache_dir) {
@@ -2558,17 +1497,6 @@ logger(LL_DEBUG, "%s length: %zu\n", #name, client->t_##name.im4p.length); \
 	}
 
 	idevicerestore_progress(client, RESTORE_STEP_PREPARE, 0.2);
-
-#ifdef HAVE_TURDUS_MERULA
-	if ((client->flags & FLAG_DOWNGRADE) && is_arm64_soc(client->cpid)) {
-		if (!(client->flags & FLAG_FETCH_BSEP)) { // checks the hashes of several important firmware components
-			logger(LL_INFO, "Checking hashes...\n");
-			if (check_firmware_components(client, build_identity)) {
-				return -1;
-			}
-		}
-	}
-#endif
 
 	/* retrieve shsh blobs if required */
 	if (tss_enabled) {
@@ -2783,22 +1711,6 @@ logger(LL_DEBUG, "%s length: %zu\n", #name, client->t_##name.im4p.length); \
 		// if the device is in DFU mode, place it into recovery mode
 		dfu_client_free(client);
 		recovery_client_free(client);
-#ifdef HAVE_LIMERA1N
-		if ((client->flags & FLAG_CUSTOM) && limera1n_is_supported(client->device)) {
-			logger(LL_INFO, "connecting to DFU\n");
-			if (dfu_client_new(client) < 0) {
-				return -1;
-			}
-			logger(LL_INFO, "exploiting with limera1n\n");
-			if (limera1n_exploit(client->device, &client->dfu->client) != 0) {
-				logger(LL_ERROR, "limera1n exploit failed\n");
-				dfu_client_free(client);
-				return -1;
-			}
-			dfu_client_free(client);
-			logger(LL_INFO, "exploited\n");
-		}
-#endif
 		if (dfu_enter_recovery(client, build_identity) < 0) {
 			logger(LL_ERROR, "Unable to place device into recovery mode from DFU mode\n");
 			if (client->tss)
@@ -2807,7 +1719,7 @@ logger(LL_DEBUG, "%s length: %zu\n", #name, client->t_##name.im4p.length); \
 		}
 	} else if (client->mode == MODE_RECOVERY) {
 		// device is in recovery mode
-		if ((client->build_major > 8) && !(client->flags & FLAG_CUSTOM)) {
+		if (client->build_major > 8) {
 			if (!client->image4supported) {
 				/* send ApTicket */
 				if (recovery_send_ticket(client) < 0) {
@@ -2876,7 +1788,7 @@ logger(LL_DEBUG, "%s length: %zu\n", #name, client->t_##name.im4p.length); \
 			free(nonce);
 		}
 
-		if (nonce_changed && !(client->flags & FLAG_CUSTOM)) {
+		if (nonce_changed) {
 			// Welcome iOS5. We have to re-request the TSS with our nonce.
 			plist_free(client->tss);
 			if (get_tss_response(client, build_identity, &client->tss) < 0) {
@@ -2897,128 +1809,6 @@ logger(LL_DEBUG, "%s length: %zu\n", #name, client->t_##name.im4p.length); \
 
 	// now finally do the magic to put the device into restore mode
 	if (client->mode == MODE_RECOVERY) {
-#ifdef HAVE_TURDUS_MERULA
-		if ((client->flags & FLAG_DOWNGRADE) && is_arm64_soc(client->cpid)) {
-			if (
-				is_a10_variant_soc(client->cpid) ||     // A10 variant
-				(client->flags & FLAG_LOAD_BSEP_SHC) || // do fwload race
-				(client->flags & FLAG_TETHERED)         // tethered
-				) // boot_tz0 race is possible even without a valid SEP image
-			{
-				{
-					// extract sep im4p
-					char* sep_path = NULL;
-					if (build_identity_has_component(build_identity, "SEP") && build_identity_get_component_path(build_identity, "SEP", &sep_path) == 0) {
-						if (extract_component(client->ipsw, sep_path, &client->sep.im4p.data, &client->sep.im4p.length) < 0) {
-							logger(LL_ERROR, "Unable to extract component: %s\n", "SEP");
-							if (sep_path) {
-								free(sep_path);
-							}
-							return -1;
-						}
-						if (!client->sep.im4p.data) {
-							if (sep_path) {
-								free(sep_path);
-							}
-							logger(LL_ERROR, "Unable to extract component: %s\n", "SEP");
-							return -1;
-						}
-						// save SEP.im4p for tethered
-						if (client->flags & FLAG_TETHERED) {
-							char zfn[1024];
-							if (client->cache_dir) {
-								strcpy(zfn, client->cache_dir);
-								strcat(zfn, "/image4");
-							}
-							else {
-								strcpy(zfn, "image4");
-							}
-							mkdir_with_parents(zfn, 0755);
-							snprintf(&zfn[0] + strlen(zfn), sizeof(zfn) - strlen(zfn), "/%" PRIu64 "-%s-%s-SEP.im4p", client->ecid, client->device->product_type, client->version);
-							FILE *zf = fopen(zfn, "wb");
-							if (!zf) {
-								logger(LL_ERROR, "Opening %s\n", zfn);
-								free(client->sep.im4p.data);
-								if (sep_path) {
-									free(sep_path);
-								}
-								return -1;
-							}
-							fwrite(client->sep.im4p.data, client->sep.im4p.length, 1, zf);
-							fflush(zf);
-							fclose(zf);
-							logger(LL_INFO, "SEP im4p saved to '%s'\n", zfn);
-						}
-						if (sep_path) {
-							free(sep_path);
-						}
-					}
-					else {
-						logger(LL_ERROR, "Unable to extract component: %s\n", "SEP");
-						if (sep_path) {
-							free(sep_path);
-						}
-						return -1;
-					}
-				}
-				
-				{
-					if (!client->rsep.data || !client->rsep.identity) {
-						logger(LL_ERROR, "Could not find information about RestoreSEP\n");
-						return -1;
-					}
-					if (force_get_tss_response(client, client->rsep.identity, &client->rsep.tss) < 0) {
-						logger(LL_ERROR, "Unable to get latest SHSH\n");
-						return -1;
-					}
-					if (personalize_component(client, "RestoreSEP", client->rsep.data, client->rsep.length, client->rsep.tss, &client->sep.img4.data, &client->sep.img4.length) < 0) {
-						logger(LL_ERROR, "Unable to get personalized component: %s\n", "RestoreSEP");
-						return -1;
-					}
-					if (client->flags & FLAG_TETHERED) {
-						// save it
-						uint8_t* cached_sep = NULL;
-						size_t cached_sep_len = 0;
-						if (personalize_component(client, "SEPTethered", client->rsep.data, client->rsep.length, client->rsep.tss, (void **)&cached_sep, &cached_sep_len) < 0) {
-							logger(LL_ERROR, "Unable to get personalized component: %s\n", "SEP");
-							return -1;
-						}
-						
-						if (cached_sep) {
-							char zfn[1024];
-							if (client->cache_dir) {
-								strcpy(zfn, client->cache_dir);
-								strcat(zfn, "/image4");
-							}
-							else {
-								strcpy(zfn, "image4");
-							}
-							mkdir_with_parents(zfn, 0755);
-							snprintf(&zfn[0] + strlen(zfn), sizeof(zfn) - strlen(zfn), "/%" PRIu64 "-%s-signed-SEP.img4", client->ecid, client->device->product_type);
-							FILE *zf = fopen(zfn, "wb");
-							if (!zf) {
-								logger(LL_ERROR, "Opening %s\n", zfn);
-								free(cached_sep);
-								return -1;
-							}
-							fwrite(cached_sep, cached_sep_len, 1, zf);
-							fflush(zf);
-							fclose(zf);
-							logger(LL_INFO, "SEP img4 saved to '%s'\n", zfn);
-							
-							free(cached_sep);
-							cached_sep = NULL;
-							cached_sep_len = 0;
-						}
-						else {
-							logger(LL_ERROR, "Unable to get cached component: %s\n", "SEP");
-							return -1;
-						}
-					}
-				}
-			}
-		}
-#endif
 		if (recovery_enter_restore(client, build_identity) < 0) {
 			logger(LL_ERROR, "Unable to place device into restore mode\n");
 			if (client->tss)
@@ -3033,167 +1823,6 @@ logger(LL_DEBUG, "%s length: %zu\n", #name, client->t_##name.im4p.length); \
 		mutex_lock(&client->device_event_mutex);
 		logger(LL_INFO, "Waiting for device to enter restore mode...\n");
 		cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 100000000);
-#ifdef HAVE_TURDUS_MERULA
-		if ((client->flags & FLAG_DOWNGRADE) && is_arm64_soc(client->cpid)) {
-			plist_t my_tss = NULL;
-			// allocate image4 manifest
-			if ((client->flags & FLAG_TETHERED) || ((client->flags & FLAG_FETCH_BSEP) && (client->flags & FLAG_LOAD_BSEP_SHC))) {
-				if (!client->rsep.tss) {
-					logger(LL_ERROR, "no RestoreSEP shsh buffer\n");
-					return -1;
-				}
-				my_tss = client->rsep.tss;
-			}
-			else if (!(client->flags & FLAG_FETCH_BSEP)) {
-				// use cached blob
-				if (!client->local_shsh) {
-					logger(LL_ERROR, "no local shsh buffer\n");
-					return -1;
-				}
-				my_tss = client->local_shsh;
-			}
-			
-			if (my_tss) {
-				plist_t apimg4ticket_tss = plist_dict_get_item(my_tss, "ApImg4Ticket");
-				if (apimg4ticket_tss) {
-					uint64_t im4m_length = 0;
-					plist_get_data_val(apimg4ticket_tss, (char**)&client->sep.im4m.data, &im4m_length);
-					client->sep.im4m.length = (size_t)im4m_length;
-				}
-				if (!client->sep.im4m.data) {
-					logger(LL_ERROR, "no img4 manifest\n");
-					return -1;
-				}
-				
-				if (have_arm64_single_stage_iboot(client->cpid)) {
-					unsigned char tsha384[SHA384_DIGEST_LENGTH];
-					memset(tsha384, 0, SHA384_DIGEST_LENGTH);
-					sha384_context sha384ctx;
-					sha384_init(&sha384ctx);
-					sha384_update(&sha384ctx, client->sep.im4m.data, client->sep.im4m.length);
-					sha384_final(&sha384ctx, tsha384);
-					client->sep.mhash.length = SHA384_DIGEST_LENGTH;
-					client->sep.mhash.data = malloc(client->sep.mhash.length);
-					if (!client->sep.mhash.data) {
-						logger(LL_ERROR, "malloc failed\n");
-						return -1;
-					}
-					memset(client->sep.mhash.data, 0, client->sep.mhash.length);
-					memcpy(client->sep.mhash.data, tsha384, SHA384_DIGEST_LENGTH);
-				}
-				else if (have_arm64_second_stage_iboot(client->cpid)) {
-					unsigned char tsha1[SHA1_DIGEST_LENGTH];
-					memset(tsha1, 0, SHA1_DIGEST_LENGTH);
-					sha1_context sha1ctx;
-					sha1_init(&sha1ctx);
-					sha1_update(&sha1ctx, client->sep.im4m.data, client->sep.im4m.length);
-					sha1_final(&sha1ctx, tsha1);
-					client->sep.mhash.length = SHA1_DIGEST_LENGTH;
-					client->sep.mhash.data = malloc(client->sep.mhash.length);
-					if (!client->sep.mhash.data) {
-						logger(LL_ERROR, "malloc failed\n");
-						return -1;
-					}
-					memset(client->sep.mhash.data, 0, client->sep.mhash.length);
-					memcpy(client->sep.mhash.data, tsha1, SHA1_DIGEST_LENGTH);
-				}
-				else {
-					logger(LL_ERROR, "Found unknown device\n");
-					return -1;
-				}
-				if (!client->sep.mhash.data) {
-					logger(LL_ERROR, "no img4 manifest hash\n");
-					return -1;
-				}
-				
-				uint8_t* _manifest_hash = (uint8_t*)client->sep.mhash.data;
-				fprintf(stderr, "img4 manifest hash: ");
-				for (int i = 0; i < client->sep.mhash.length; i++) {
-					fprintf(stderr, "%02x", _manifest_hash[i]);
-				}
-				fprintf(stderr, "\n");
-			}
-			
-			if (client->mode == MODE_DFU) {
-				if (dfu_get_yolo_checkra1n(client) == 0) {
-					logger(LL_INFO, "Device entered yolo (checkra1n) DFU mode.\n");
-					
-					// send pongo
-					if (send_pongo_image(client) != 0) {
-						mutex_unlock(&client->device_event_mutex);
-						if (!(client->flags & FLAG_QUIT)) {
-							logger(LL_ERROR, "Failed to upload PongoOS image\n");
-						}
-						return -1;
-					}
-					
-					logger(LL_INFO, "Waiting for device to disconnect...\n");
-					cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 1000000);
-					if (client->mode != MODE_UNKNOWN || (client->flags & FLAG_QUIT)) {
-						mutex_unlock(&client->device_event_mutex);
-						if (!(client->flags & FLAG_QUIT)) {
-							logger(LL_ERROR, "Device did not disconnect. Reset device and try again.\n");
-						}
-						return -1;
-					}
-					
-					logger(LL_INFO, "Waiting for device to enter Pongo mode...\n");
-					cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 500000000);
-				}
-			}
-			
-			if (client->mode == MODE_PONGO) {
-				logger(LL_INFO, "Found PongoOS device\n");
-				if (client->dfu == NULL) {
-					if (dfu_client_new(client) < 0) {
-						mutex_unlock(&client->device_event_mutex);
-						if (!(client->flags & FLAG_QUIT)) {
-							logger(LL_ERROR, "Failed to create client\n");
-						}
-						return -1;
-					}
-				}
-				
-				int is_pongo_only = 0;
-				int is_tethered = 0;
-				unsigned int boot_delay = 0;
-				if (client->flags & FLAG_FETCH_BSEP) {
-					is_pongo_only = 1;
-				}
-				if (client->flags & FLAG_TETHERED) {
-					is_tethered = 1;
-				}
-				if (client->device->product_type && strncmp(client->device->product_type, "AppleTV", 7) == 0) {
-					boot_delay = 10;
-				}
-				if (pongo_shell(client, client->device, &client->dfu->client, is_pongo_only, is_tethered, boot_delay)) {
-					mutex_unlock(&client->device_event_mutex);
-					if (!(client->flags & FLAG_QUIT)) {
-						logger(LL_ERROR, "Failed to execute Pongo shell\n");
-					}
-					return -1;
-				}
-				
-				if (client->flags & FLAG_FETCH_BSEP) {
-					mutex_unlock(&client->device_event_mutex);
-					return 0;
-				}
-				
-				logger(LL_INFO, "Waiting for device to disconnect...\n");
-				cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 1000000);
-				if (client->mode != MODE_UNKNOWN || (client->flags & FLAG_QUIT)) {
-					mutex_unlock(&client->device_event_mutex);
-					if (!(client->flags & FLAG_QUIT)) {
-						logger(LL_ERROR, "Device did not disconnect. Reset device and try again.\n");
-					}
-					return -1;
-				}
-				
-				logger(LL_INFO, "Waiting for device to enter restore mode...\n");
-				cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 500000000);
-			}
-		}
-#endif
 		if (client->mode != MODE_RESTORE || (client->flags & FLAG_QUIT)) {
 			mutex_unlock(&client->device_event_mutex);
 			logger(LL_ERROR, "Device failed to enter restore mode.\n");
@@ -3327,32 +1956,14 @@ void idevicerestore_client_free(struct idevicerestore_client_t* client)
 	if (client->bbfw.data) {
 		free(client->bbfw.data);
 	}
-	if (client->sefw.data) {
-		free(client->sefw.data);
-	}
-	if (client->rsep.data) {
-		free(client->rsep.data);
-	}
 	if (client->bbfw.manifest) {
 		plist_free(client->bbfw.manifest);
-	}
-	if (client->sefw.manifest) {
-		plist_free(client->sefw.manifest);
-	}
-	if (client->rsep.manifest) {
-		plist_free(client->rsep.manifest);
 	}
 	if (client->base.manifest) {
 		plist_free(client->base.manifest);
 	}
 	if (client->bbfw.variant) {
 		free(client->bbfw.variant);
-	}
-	if (client->sefw.variant) {
-		free(client->sefw.variant);
-	}
-	if (client->rsep.variant) {
-		free(client->rsep.variant);
 	}
 	if (client->base.variant) {
 		free(client->base.variant);
@@ -3362,12 +1973,6 @@ void idevicerestore_client_free(struct idevicerestore_client_t* client)
 	}
 	if (client->bbfw.tss) {
 		plist_free(client->bbfw.tss);
-	}
-	if (client->sefw.tss) {
-		plist_free(client->sefw.tss);
-	}
-	if (client->rsep.tss) {
-		plist_free(client->rsep.tss);
 	}
 	if (client->base.tss) {
 		plist_free(client->base.tss);
@@ -3407,39 +2012,6 @@ void idevicerestore_client_free(struct idevicerestore_client_t* client)
 	}
 	if (ap_shsh_path) {
 		free(ap_shsh_path);
-	}
-	if (client->cryptex1_nonce_seed) {
-		free(client->cryptex1_nonce_seed);
-	}
-	if (client->sep.im4p.data) {
-		free(client->sep.im4p.data);
-	}
-	if (client->sep.img4.data) {
-		free(client->sep.img4.data);
-	}
-	if (client->sep.im4m.data) {
-		free(client->sep.im4m.data);
-	}
-	if (client->sep.mhash.data) {
-		free(client->sep.mhash.data);
-	}
-	if (client->sep_shellcode_block) {
-		free(client->sep_shellcode_block);
-	}
-	if (gPongoOS) {
-		free(gPongoOS);
-	}
-	if (gSEPRacer) {
-		free(gSEPRacer);
-	}
-	if (gKPF) {
-		free(gKPF);
-	}
-	if (gCPF) {
-		free(gCPF);
-	}
-	if (gRAMDisk) {
-		free(gRAMDisk);
 	}
 #endif
 	free(client->restore_variant);
@@ -3575,10 +2147,6 @@ int main(int argc, char* argv[])
 
 	idevicerestore_client = client;
 
-#ifdef HAVE_TURDUS_MERULA
-	client->disable_serial_output = 1;
-#endif
-
 #ifdef WIN32
 	signal(SIGINT, handle_signal);
 	signal(SIGTERM, handle_signal);
@@ -3600,19 +2168,13 @@ int main(int argc, char* argv[])
 		client->flags |= FLAG_INTERACTIVE;
 	}
 
-#ifdef HAVE_LIMERA1N
-#define P_FLAG "p"
-#else
-#define P_FLAG ""
-#endif
-
 #ifdef HAVE_TURDUS_MERULA
 #define TURDUS_MERULA_FLAG "wo"
 #else
 #define TURDUS_MERULA_FLAG ""
 #endif
 
-	while ((opt = getopt_long(argc, argv, "dhces:xtli:u:nC:kyPRT:zv" P_FLAG TURDUS_MERULA_FLAG, longopts, &optindex)) > 0) {
+	while ((opt = getopt_long(argc, argv, "dhes:xtli:u:nC:kyPRT:zv" TURDUS_MERULA_FLAG, longopts, &optindex)) > 0) {
 		switch (opt) {
 		case 'h':
 			usage(argc, argv, 0);
@@ -3628,10 +2190,6 @@ int main(int argc, char* argv[])
 
 		case 'e':
 			client->flags |= FLAG_ERASE;
-			break;
-
-		case 'c':
-			client->flags |= FLAG_CUSTOM;
 			break;
 
 		case 's': {
@@ -3704,12 +2262,6 @@ int main(int argc, char* argv[])
 		case 'k':
 			client->flags |= FLAG_KEEP_PERS;
 			break;
-
-#ifdef HAVE_LIMERA1N
-		case 'p':
-			client->flags |= FLAG_PWN;
-			break;
-#endif
 
 		case 'n':
 			client->flags |= FLAG_NOACTION;
@@ -3820,30 +2372,6 @@ int main(int argc, char* argv[])
 				}
 				break;
 				
-			case 15:
-				if (!*optarg) {
-					logger(LL_ERROR, "PATH argument for --sefw must not be empty!\n");
-					usage(argc, argv, 1);
-					return EXIT_FAILURE;
-				}
-				if (load_firmware_component_data(optarg, &client->sefw, "sefw") != 0) {
-					usage(argc, argv, 1);
-					return EXIT_FAILURE;
-				}
-				break;
-				
-			case 18:
-				if (!*optarg) {
-					logger(LL_ERROR, "PATH argument for --rsep must not be empty!\n");
-					usage(argc, argv, 1);
-					return EXIT_FAILURE;
-				}
-				if (load_firmware_component_data(optarg, &client->rsep, "rsep") != 0) {
-					usage(argc, argv, 1);
-					return EXIT_FAILURE;
-				}
-				break;
-				
 			case 13:
 				if (!*optarg) {
 					logger(LL_ERROR, "PATH argument for --bbfw-manifest must not be empty!\n");
@@ -3851,30 +2379,6 @@ int main(int argc, char* argv[])
 					return EXIT_FAILURE;
 				}
 				if (load_firmware_component_plist(optarg, &client->bbfw, "bbfw") != 0) {
-					usage(argc, argv, 1);
-					return EXIT_FAILURE;
-				}
-				break;
-				
-			case 16:
-				if (!*optarg) {
-					logger(LL_ERROR, "PATH argument for --sefw-manifest must not be empty!\n");
-					usage(argc, argv, 1);
-					return EXIT_FAILURE;
-				}
-				if (load_firmware_component_plist(optarg, &client->sefw, "sefw") != 0) {
-					usage(argc, argv, 1);
-					return EXIT_FAILURE;
-				}
-				break;
-				
-			case 19:
-				if (!*optarg) {
-					logger(LL_ERROR, "PATH argument for --rsep-manifest must not be empty!\n");
-					usage(argc, argv, 1);
-					return EXIT_FAILURE;
-				}
-				if (load_firmware_component_plist(optarg, &client->rsep, "rsep") != 0) {
 					usage(argc, argv, 1);
 					return EXIT_FAILURE;
 				}
@@ -3902,26 +2406,6 @@ int main(int argc, char* argv[])
 				client->bbfw.variant = strdup(optarg);
 				break;
 				
-			case 17:
-				if (!*optarg) {
-					logger(LL_ERROR, "VARIANT argument for --sefw-variant must not be empty!\n");
-					usage(argc, argv, 1);
-					return EXIT_FAILURE;
-				}
-				free(client->sefw.variant);
-				client->sefw.variant = strdup(optarg);
-				break;
-				
-			case 20:
-				if (!*optarg) {
-					logger(LL_ERROR, "VARIANT argument for --rsep-variant must not be empty!\n");
-					usage(argc, argv, 1);
-					return EXIT_FAILURE;
-				}
-				free(client->rsep.variant);
-				client->rsep.variant = strdup(optarg);
-				break;
-				
 			case 22:
 				if (!*optarg) {
 					logger(LL_ERROR, "VARIANT argument for --base-variant must not be empty!\n");
@@ -3942,92 +2426,9 @@ int main(int argc, char* argv[])
 				client->use_custom_ticket = 1;
 				break;
 				
-			case 24:
-				if (!*optarg) {
-					logger(LL_ERROR, "PATH argument for --load-shcblock must not be empty!\n");
-					usage(argc, argv, 1);
-					return EXIT_FAILURE;
-				}
-				if (client->sep_shellcode_block) {
-					logger(LL_ERROR, "Already block loaded\n");
-					usage(argc, argv, 1);
-					return EXIT_FAILURE;
-				}
-				if (read_file_safe(optarg, (void**)&client->sep_shellcode_block, &client->sep_shellcode_block_len, 0x400) != 0) {
-					return EXIT_FAILURE;
-				}
-				logger(LL_INFO, "Using SEP shellcode ciphertext block, found at %s length %zu\n", optarg, client->sep_shellcode_block_len);
-				client->flags |= FLAG_LOAD_BSEP_SHC;
-				break;
-				
-			case 25:
-				if (!*optarg) {
-					logger(LL_ERROR, "PATH argument for --load-pteblock must not be empty!\n");
-					usage(argc, argv, 1);
-					return EXIT_FAILURE;
-				}
-				if (client->sep_shellcode_block) {
-					logger(LL_ERROR, "Already block loaded\n");
-					usage(argc, argv, 1);
-					return EXIT_FAILURE;
-				}
-				if (read_file_safe(optarg, (void**)&client->sep_shellcode_block, &client->sep_shellcode_block_len, 0x400) != 0) {
-					return EXIT_FAILURE;
-				}
-				logger(LL_INFO, "Using SEP page table entry ciphertext block, found at %s length %zu\n", optarg, client->sep_shellcode_block_len);
-				client->flags |= FLAG_LOAD_BSEP_PTE;
-				break;
-				
-			case 26:
-				client->disable_serial_output = 0;
-				break;
-				
-			case 27:
-				client->flags |= FLAG_DOWNGRADE;
-				client->flags |= FLAG_FETCH_BSEP_SHC;
-				break;
-				
-			case 28:
-				client->flags |= FLAG_DOWNGRADE;
-				client->flags |= FLAG_FETCH_BSEP_PTE;
-				break;
-				
 			case 29:
 				client->flags |= FLAG_ALLOW_UNSUPPORTED;
 				break;
-				
-			case 30:
-				printf("Embedded modules hashes [compressed]:\n");
-				print_module_hash("Pongo.bin", "zstd", Pongo_bin, Pongo_bin_len);
-				print_module_hash("cpf.bin", "zstd", cpf_bin, cpf_bin_len);
-				print_module_hash("kpf.bin", "zstd", kpf_bin, kpf_bin_len);
-				print_module_hash("sep_racer.bin", "zstd", sep_racer_bin, sep_racer_bin_len);
-				print_module_hash("iPhoneOS_overlay.dmg", "zstd", overlay_iphoneos_bin, overlay_iphoneos_bin_len);
-				print_module_hash("tvOS_overlay.dmg", "zstd", overlay_tvos_bin, overlay_tvos_bin_len);
-				print_module_hash("iPhoneOS_union.dmg", "zstd", union_iphoneos_bin, union_iphoneos_bin_len);
-				print_module_hash("tvOS_union.dmg", "zstd", union_tvos_bin, union_tvos_bin_len);
-#define PRINT_MODULE_HASH_UNZSTD(name, srcb, srcl, maxl) do { \
-void *_dstb = NULL; \
-size_t _dstl = 0; \
-if (decompress_zstd_buffer((const void *)(srcb), (const size_t)(srcl), (size_t)(maxl), &_dstb, &_dstl) != 0) { \
-logger(LL_ERROR, "Decompress failed: %s\n", (name)); \
-} \
-if (_dstb == NULL) { \
-logger(LL_ERROR, "Out of memory?: %s\n", (name)); \
-} \
-print_module_hash((name), "raw", _dstb, _dstl); \
-if (_dstb) free(_dstb); \
-} while (0);
-				printf("Embedded modules hashes [decompressed]:\n");
-				PRINT_MODULE_HASH_UNZSTD("Pongo.bin", Pongo_bin, Pongo_bin_len, MAX_PONGO_SIZE);
-				PRINT_MODULE_HASH_UNZSTD("cpf.bin", cpf_bin, cpf_bin_len, MAX_MODULE_SIZE);
-				PRINT_MODULE_HASH_UNZSTD("kpf.bin", kpf_bin, kpf_bin_len, MAX_MODULE_SIZE);
-				PRINT_MODULE_HASH_UNZSTD("sep_racer.bin", sep_racer_bin, sep_racer_bin_len, MAX_MODULE_SIZE);
-				PRINT_MODULE_HASH_UNZSTD("iPhoneOS_overlay.dmg", overlay_iphoneos_bin, overlay_iphoneos_bin_len, MAX_RAMDISK_SIZE);
-				PRINT_MODULE_HASH_UNZSTD("tvOS_overlay.dmg", overlay_tvos_bin, overlay_tvos_bin_len, MAX_RAMDISK_SIZE);
-				PRINT_MODULE_HASH_UNZSTD("iPhoneOS_union.dmg", union_iphoneos_bin, union_iphoneos_bin_len, MAX_RAMDISK_SIZE);
-				PRINT_MODULE_HASH_UNZSTD("tvOS_union.dmg", union_tvos_bin, union_tvos_bin_len, MAX_RAMDISK_SIZE);
-				return EXIT_SUCCESS;
 				
 			case 31:
 				if (gAPIURL) {
@@ -4056,91 +2457,6 @@ if (_dstb) free(_dstb); \
 					return EXIT_FAILURE;
 				}
 				break;
-				
-			case 32:
-				if (!*optarg) {
-					logger(LL_ERROR, "PATH argument for --override-kpf must not be empty!\n");
-					usage(argc, argv, 1);
-					return EXIT_FAILURE;
-				}
-				if (gKPF) {
-					free(gKPF);
-					gKPF = NULL;
-					gKPFLength = 0;
-				}
-				if (read_aligned_file_safe(optarg, (void**)&gKPF, &gKPFLength, MAX_MODULE_SIZE) != 0) {
-					return EXIT_FAILURE;
-				}
-				logger(LL_INFO, "Loaded custom KPF module, found at %s length %zu\n", optarg, gKPFLength);
-				break;
-				
-			case 33:
-				if (!*optarg) {
-					logger(LL_ERROR, "PATH argument for --override-cpf must not be empty!\n");
-					usage(argc, argv, 1);
-					return EXIT_FAILURE;
-				}
-				if (gCPF) {
-					free(gCPF);
-					gCPF = NULL;
-					gCPFLength = 0;
-				}
-				if (read_aligned_file_safe(optarg, (void**)&gCPF, &gCPFLength, MAX_MODULE_SIZE) != 0) {
-					return EXIT_FAILURE;
-				}
-				logger(LL_INFO, "Loaded custom CPF module, found at %s length %zu\n", optarg, gCPFLength);
-				break;
-				
-			case 34:
-				if (!*optarg) {
-					logger(LL_ERROR, "PATH argument for --override-sep-racer must not be empty!\n");
-					usage(argc, argv, 1);
-					return EXIT_FAILURE;
-				}
-				if (gSEPRacer) {
-					free(gSEPRacer);
-					gSEPRacer = NULL;
-					gSEPRacerLength = 0;
-				}
-				if (read_aligned_file_safe(optarg, (void**)&gSEPRacer, &gSEPRacerLength, MAX_MODULE_SIZE) != 0) {
-					return EXIT_FAILURE;
-				}
-				logger(LL_INFO, "Loaded custom sep_racer module, found at %s length %zu\n", optarg, gSEPRacerLength);
-				break;
-				
-			case 35:
-				if (!*optarg) {
-					logger(LL_ERROR, "PATH argument for --override-pongo must not be empty!\n");
-					usage(argc, argv, 1);
-					return EXIT_FAILURE;
-				}
-				if (gPongoOS) {
-					free(gPongoOS);
-					gPongoOS = NULL;
-					gPongoOSLength = 0;
-				}
-				if (read_aligned_file_safe(optarg, (void**)&gPongoOS, &gPongoOSLength, MAX_PONGO_SIZE) != 0) {
-					return EXIT_FAILURE;
-				}
-				logger(LL_INFO, "Loaded custom Pongo, found at %s length %zu\n", optarg, gPongoOSLength);
-				break;
-				
-			case 36:
-				if (!*optarg) {
-					logger(LL_ERROR, "PATH argument for --override-ramdisk must not be empty!\n");
-					usage(argc, argv, 1);
-					return EXIT_FAILURE;
-				}
-				if (gRAMDisk) {
-					free(gRAMDisk);
-					gRAMDisk = NULL;
-					gRAMDiskLength = 0;
-				}
-				if (read_aligned_file_safe(optarg, (void**)&gRAMDisk, &gRAMDiskLength, MAX_RAMDISK_SIZE) != 0) {
-					return EXIT_FAILURE;
-				}
-				logger(LL_INFO, "Loaded custom overlay ramdisk, found at %s length %zu\n", optarg, gRAMDiskLength);
-				break;
 #endif
 
 		default:
@@ -4158,18 +2474,13 @@ if (_dstb) free(_dstb); \
 		return (ipsw_print_info(*(argv + optind)) == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 	}
 
-	if (((argc-optind) == 1) || (client->flags & FLAG_PWN) || (client->flags & FLAG_LATEST)) {
+	if (((argc-optind) == 1) || (client->flags & FLAG_LATEST)) {
 		argc -= optind;
 		argv += optind;
 
 		ipsw = argv[0];
 	} else {
 		usage(argc, argv, 1);
-		return EXIT_FAILURE;
-	}
-
-	if ((client->flags & FLAG_LATEST) && (client->flags & FLAG_CUSTOM)) {
-		logger(LL_ERROR, "You can't use --custom and --latest options at the same time.\n");
 		return EXIT_FAILURE;
 	}
 
@@ -4231,9 +2542,6 @@ irecv_device_t get_irecv_device(struct idevicerestore_client_t *client)
 	case _MODE_DFU:
 	case _MODE_PORTDFU:
 	case _MODE_RECOVERY:
-#ifdef HAVE_TURDUS_MERULA
-	case _MODE_PONGO:
-#endif
 		return dfu_get_irecv_device(client);
 
 	default:
@@ -4482,9 +2790,9 @@ int get_tss_response(struct idevicerestore_client_t* client, plist_t build_ident
 	*tss = NULL;
 
 #ifdef HAVE_TURDUS_MERULA
-	uint64_t mask_flag = FLAG_DOWNGRADE | FLAG_CUSTOM;
+	uint64_t mask_flag = FLAG_DOWNGRADE;
 #else
-	uint64_t mask_flag = FLAG_CUSTOM;
+	uint64_t mask_flag = 0;
 #endif
 	if ((client->build_major <= 8) || (client->flags & mask_flag)) {
 		logger(LL_INFO, "Checking for local shsh\n");
@@ -4498,7 +2806,7 @@ int get_tss_response(struct idevicerestore_client_t* client, plist_t build_ident
 				logger(LL_INFO, "Using cached SHSH\n");
 				return 0;
 			}
-			else if ((client->flags & FLAG_TETHERED) || (client->flags & FLAG_FETCH_BSEP)) {
+			else if (client->flags & FLAG_TETHERED) {
 				if (client->base.tss) {
 					*tss = plist_copy(client->base.tss);
 					logger(LL_INFO, "Using cached SHSH\n");

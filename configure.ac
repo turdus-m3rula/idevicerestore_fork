@@ -24,7 +24,6 @@ LIBTATSU_VERSION=1.0.4
 LIBZIP_VERSION=1.0
 LIBCURL_VERSION=7.0
 LIBFRAGMENTZIP_VERSION=54
-ZSTD_VERSION=1.5.7
 
 AC_SUBST(LIBIRECOVERY_VERSION)
 AC_SUBST(LIBIMOBILEDEVICE_VERSION)
@@ -152,16 +151,6 @@ if test "$ac_cv_reverse_proxy" = "yes"; then
 	AC_DEFINE(HAVE_REVERSE_PROXY, 1, [Define if libimobiledevice has a reverse proxy implementation])
 fi
 
-AC_ARG_WITH([limera1n],
-            [AS_HELP_STRING([--with-limera1n],
-            [build with support for limera1n exploit (default is yes)])],
-            [have_limera1n=$withval],
-            [have_limera1n=yes])
-if test "x$have_limera1n" = "xyes"; then
-  AC_DEFINE(HAVE_LIMERA1N, 1, [Define if limera1n support is available])
-fi
-AM_CONDITIONAL([HAVE_LIMERA1N],[test "x$have_limera1n" = "xyes"])
-
 AC_ARG_WITH([turdusmerula],
             [AS_HELP_STRING([--with-turdusmerula],
             [build with support for turdus merula (default is no)])],
@@ -170,9 +159,7 @@ AC_ARG_WITH([turdusmerula],
 if test "x$have_turdusmerula" = "xyes"; then
   AC_DEFINE(HAVE_TURDUS_MERULA, 1, [Define if turdus merula support is available])
   AC_SUBST(LIBFRAGMENTZIP_VERSION)
-  AC_SUBST(ZSTD_VERSION)
   PKG_CHECK_MODULES(libfragmentzip, libfragmentzip >= $LIBFRAGMENTZIP_VERSION)
-  PKG_CHECK_MODULES(libzstd, libzstd >= $ZSTD_VERSION)
 fi
 AM_CONDITIONAL([HAVE_TURDUS_MERULA],[test "x$have_turdusmerula" = "xyes"])
 
