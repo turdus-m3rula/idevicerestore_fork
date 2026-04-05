@@ -78,20 +78,20 @@ typedef struct {
 #define IMG4_DIGEST_MATCHED_PAYLOAD   (1 << 3)
 
 #pragma mark - global
-void* gPongoOS;
-size_t gPongoOSLength;
+extern void* gPongoOS;
+extern size_t gPongoOSLength;
 
-void* gSEPRacer;
-size_t gSEPRacerLength;
+extern void* gSEPRacer;
+extern size_t gSEPRacerLength;
 
-void* gKPF;
-size_t gKPFLength;
+extern void* gKPF;
+extern size_t gKPFLength;
 
-void* gCPF;
-size_t gCPFLength;
+extern void* gCPF;
+extern size_t gCPFLength;
 
-void* gRAMDisk;
-size_t gRAMDiskLength;
+extern void* gRAMDisk;
+extern size_t gRAMDiskLength;
 
 void fragmentzip_callback(unsigned int p);
 
