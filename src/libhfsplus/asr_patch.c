@@ -3,8 +3,64 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
+
+#ifdef __APPLE__
 #include <CommonCrypto/CommonDigest.h>
+#define SHA1_HASH_LENGTH CC_SHA1_DIGEST_LENGTH
+#define SHA1_HASH_CTX    CC_SHA1_CTX
+#define SHA1_HASH_INIT   CC_SHA1_Init
+#define SHA1_HASH_UPDATE CC_SHA1_Update
+#define SHA1_HASH_FINAL  CC_SHA1_Final
+#define SHA1_HASH_LONG   CC_LONG
 #include <mach-o/loader.h>
+#else
+#include <openssl/sha.h>
+#define SHA1_HASH_LENGTH SHA_DIGEST_LENGTH
+#define SHA1_HASH_CTX    SHA_CTX
+#define SHA1_HASH_INIT   SHA1_Init
+#define SHA1_HASH_UPDATE SHA1_Update
+#define SHA1_HASH_FINAL  SHA1_Final
+#define SHA1_HASH_LONG   size_t
+
+#define	MH_MAGIC         0xfeedface /* the mach magic number */
+#define	LC_SEGMENT	     0x1        /* segment of this file to be mapped */
+
+typedef int32_t   integer_t;
+typedef integer_t cpu_type_t;
+typedef integer_t cpu_subtype_t;
+typedef integer_t cpu_threadtype_t;
+typedef int       vm_prot_t;
+
+struct mach_header {
+	uint32_t      magic;      /* mach magic number identifier */
+	cpu_type_t    cputype;    /* cpu specifier */
+	cpu_subtype_t cpusubtype; /* machine specifier */
+	uint32_t      filetype;   /* type of file */
+	uint32_t      ncmds;      /* number of load commands */
+	uint32_t      sizeofcmds; /* the size of all the load commands */
+	uint32_t      flags;      /* flags */
+};
+
+struct load_command {
+	uint32_t cmd;     /* type of load command */
+	uint32_t cmdsize; /* total size of command in bytes */
+};
+
+struct segment_command   { /* for 32-bit architectures */
+	uint32_t  cmd;         /* LC_SEGMENT */
+	uint32_t  cmdsize;     /* includes sizeof section structs */
+	char      segname[16]; /* segment name */
+	uint32_t  vmaddr;      /* memory address of this segment */
+	uint32_t  vmsize;      /* memory size of this segment */
+	uint32_t  fileoff;     /* file offset of this segment */
+	uint32_t  filesize;    /* amount to map from the file */
+	vm_prot_t maxprot;     /* maximum VM protection */
+	vm_prot_t initprot;    /* initial VM protection */
+	uint32_t  nsects;      /* number of sections in segment */
+	uint32_t  flags;       /* flags */
+};
+
+#endif
 
 //#define LOG(fmt, ...) \
 //do { \
@@ -31,7 +87,7 @@ struct CodeDirectory {
 };
 
 struct CodeHash {
-	unsigned char hash[CC_SHA1_DIGEST_LENGTH];
+	unsigned char hash[SHA1_HASH_LENGTH];
 };
 
 static uint32_t read_u32_be(const void *p)
@@ -362,15 +418,15 @@ static int validateHash(unsigned char *pageHash, unsigned char *hash)
 	char hashStr[128];
 	memset(hashStr, 0, 128);
 	
-	for (int i = 0; i < CC_SHA1_DIGEST_LENGTH; i++) {
+	for (int i = 0; i < SHA1_HASH_LENGTH; i++) {
 		sprintf(pageHashStr, "%s%02x", pageHashStr, pageHash[i]);
 	}
 	
-	for (int i = 0; i < CC_SHA1_DIGEST_LENGTH; i++) {
+	for (int i = 0; i < SHA1_HASH_LENGTH; i++) {
 		sprintf(hashStr, "%s%02x", hashStr, hash[i]);
 	}
 	
-	for (i = 0; i < CC_SHA1_DIGEST_LENGTH; i++) {
+	for (i = 0; i < SHA1_HASH_LENGTH; i++) {
 		if (pageHash[i] != hash[i]) {
 			equal = false;
 			hash[i] = pageHash[i];
@@ -425,23 +481,23 @@ int patch_asr(uint8_t* data, size_t length)
 	size_t hashOffset = read_u32_be(&codeDirectory->hashOffset);
 	struct CodeHash *codeHash = (struct CodeHash *)(data + csdir_start + hashOffset); // nCodeSlot start
 	
-	unsigned char pageHash[CC_SHA1_DIGEST_LENGTH];
+	unsigned char pageHash[SHA1_HASH_LENGTH];
 	
 	size_t pageSize = 1 << codeDirectory->pageSize;
 	
 	// check: nCodeSlots only
 	LOG("checking cs slots...");
 	for (int p = 0; p < codeLimit; p += pageSize) {
-		CC_SHA1_CTX ctx;
-		CC_SHA1_Init(&ctx);
+		SHA1_HASH_CTX ctx;
+		SHA1_HASH_INIT(&ctx);
 		
 		if(p + pageSize < codeLimit) {
-			CC_SHA1_Update(&ctx, data + p, (CC_LONG)pageSize);
+			SHA1_HASH_UPDATE(&ctx, data + p, (SHA1_HASH_LONG)pageSize);
 		}
 		else {
-			CC_SHA1_Update(&ctx, data + p, (CC_LONG)(codeLimit - p));
+			SHA1_HASH_UPDATE(&ctx, data + p, (SHA1_HASH_LONG)(codeLimit - p));
 		}
-		CC_SHA1_Final(pageHash, &ctx);
+		SHA1_HASH_FINAL(pageHash, &ctx);
 		
 		// check and fix cs slot...
 		validateHash(pageHash, codeHash->hash);
